@@ -4,7 +4,7 @@ use dogstar_protocol_types::ReceiptInfo;
 use soroban_sdk::{
     testutils::{Address as _, Ledger, MockAuth, MockAuthInvoke},
     token::StellarAssetClient,
-    IntoVal, Map, Vec,
+    vec, IntoVal, Map, Vec,
 };
 const VAULT_WASM: &[u8] =
     include_bytes!("../../target/wasm32v1-none/release/dogstar_blend_vault.wasm");
@@ -97,7 +97,7 @@ impl Swap {
 trait Managed {
     fn info(e: Env) -> ReceiptInfo;
     fn controller(e: Env) -> Address;
-    fn native_exit(e: Env, min_cash: i128) -> i128;
+    fn native_exit(e: Env, min_cash: i128, request: Bytes) -> i128;
     fn handover(e: Env, to: Address);
     fn recover(e: Env, asset: Address) -> i128;
 }
@@ -130,10 +130,10 @@ impl Round {
             quote_hash,
         };
         token::Client::new(&e, &cfg.cash).transfer(&e.current_contract_address(), &adapter, &n);
-        BlendAdapterClient::new(&e, &adapter).open(&context, &nonce, &n)
+        BlendAdapterClient::new(&e, &adapter).open(&context, &nonce, &vec![&e, n], &Bytes::new(&e))
     }
     pub fn close(e: Env, vault: Address) -> i128 {
-        ManagedClient::new(&e, &vault).native_exit(&0)
+        ManagedClient::new(&e, &vault).native_exit(&0, &Bytes::new(&e))
     }
 }
 #[contract]
@@ -231,11 +231,11 @@ fn frozen_pool_cannot_block_local_handover_and_recovery_uses_new_controller() {
         invoke: &MockAuthInvoke {
             contract: &vault,
             fn_name: "native_exit",
-            args: (0i128,).into_val(&s.e),
+            args: (0i128, Bytes::new(&s.e)).into_val(&s.e),
             sub_invokes: &[],
         },
     }]);
-    assert_eq!(managed.native_exit(&0), 1000);
+    assert_eq!(managed.native_exit(&0, &Bytes::new(&s.e)), 1000);
     assert_eq!(token::Client::new(&s.e, &s.cash).balance(&s.provider), 1000);
 }
 #[test]

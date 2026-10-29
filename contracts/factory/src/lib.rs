@@ -13,6 +13,10 @@ pub trait Registry {
     fn get(e: Env, id: Symbol, version: u32) -> ProtocolVersion;
     fn available(e: Env, id: Symbol, version: u32) -> bool;
 }
+#[contractclient(name = "CapabilitiesClient")]
+pub trait Capabilities {
+    fn capabilities(e: Env) -> u32;
+}
 #[contracttype]
 #[derive(Clone)]
 enum Key {
@@ -97,6 +101,10 @@ impl Factory {
                 "protocol_not_available"
             );
             let p = client.get(&selection.id, &selection.version);
+            assert!(
+                CapabilitiesClient::new(&e, &p.adapter).capabilities() == p.capabilities,
+                "capability_manifest_mismatch"
+            );
             assert!(
                 c.adapters.contains(&p.adapter) && !adapters.contains(&p.adapter),
                 "invalid_adapter"

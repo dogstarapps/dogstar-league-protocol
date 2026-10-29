@@ -63,6 +63,9 @@ fn hop_pair(hop: &Hop) -> (Address, Address) {
 
 #[contractimpl]
 impl SpotAdapter {
+    pub fn capabilities() -> u32 {
+        1
+    }
     pub fn __constructor(e: Env, c: AdapterConfig) {
         assert!(
             c.max_fee_bps <= 1000 && !c.routes.is_empty() && c.routes.len() <= 32,

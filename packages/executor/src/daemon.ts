@@ -18,6 +18,7 @@ import {
   type Deployment,
   type LimitOrder,
   type Player,
+  type ManagedPosition,
   type Registration,
   type RoundSnapshot,
   type WalletSigner,
@@ -96,12 +97,13 @@ export class Executor {
     try {
       let reward = snapshot.config.reward;
       if (task.method === "advance")
-        reward =
-          this.client.deployment.protocolVersion === "0.3.0"
-            ? await c.read<bigint>("advance_reward")
-            : snapshot.phase === 2 || snapshot.phase === 3
-              ? snapshot.config.reward
-              : 0n;
+        reward = (["0.3.0", "0.4.0"] as (string | undefined)[]).includes(
+          this.client.deployment.protocolVersion,
+        )
+          ? await c.read<bigint>("advance_reward")
+          : snapshot.phase === 2 || snapshot.phase === 3
+            ? snapshot.config.reward
+            : 0n;
       if (task.method === "cancel_limit") reward = 0n;
       if (task.method === "expire_limits")
         reward *= BigInt((task.args.ids as number[]).length);
@@ -135,7 +137,9 @@ export class Executor {
     if (transition) return transition;
     const c = this.client.round(s.address);
     if (s.phase !== 3 && s.phase !== 4) return;
-    const v3 = this.client.deployment.protocolVersion === "0.3.0";
+    const v3 = (["0.3.0", "0.4.0"] as (string | undefined)[]).includes(
+      this.client.deployment.protocolVersion,
+    );
     const active = v3 ? await c.read<number[]>("open_orders") : undefined;
     const total =
       active?.length ?? (s.totals.open_orders > 0 ? s.totals.next_order : 0);
@@ -199,6 +203,41 @@ export class Executor {
       const player = await c.read<Player>("player", { p });
       if (player.settled) continue;
       let blocked = false;
+      if (this.client.deployment.protocolVersion === "0.4.0") {
+        for (const position of await c.read<ManagedPosition[]>("positions", {
+          p,
+        })) {
+          if (!position.open) continue;
+          if (now >= s.config.calendar.settle_by)
+            return {
+              round: s.address,
+              method: "buyout_position",
+              args: { id: position.id, operator },
+              key: `${s.address}:position-buyout:${position.id}`,
+            };
+          const task = {
+            round: s.address,
+            method: "close_position",
+            args: {
+              id: position.id,
+              min_cash: 0n,
+              request: new Uint8Array(),
+              operator,
+            },
+            key: `${s.address}:position-close:${position.id}`,
+          };
+          try {
+            await c.transport.prepare(
+              task.method,
+              c.spec.funcArgsToScVals(task.method, task.args),
+            );
+            return task;
+          } catch (error) {
+            if (error instanceof RestorationRequired) throw error;
+            blocked = true;
+          }
+        }
+      }
       for (const asset of s.config.assets) {
         if (asset === s.config.cash) continue;
         const n = await c.read<bigint>("balance", { p, asset });

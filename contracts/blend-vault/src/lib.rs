@@ -6,7 +6,7 @@ use dogstar_protocol_types::ReceiptInfo;
 pub use dogstar_vault_types::{BlendSettings, VaultContext};
 use soroban_sdk::{
     auth::{ContractContext, InvokerContractAuthEntry, SubContractInvocation},
-    contract, contractclient, contractimpl, contracttype, token, vec, Address, BytesN, Env,
+    contract, contractclient, contractimpl, contracttype, token, vec, Address, Bytes, BytesN, Env,
     Executable, IntoVal, Symbol, Vec,
 };
 #[contractclient(name = "SwapClient")]
@@ -195,11 +195,12 @@ impl BlendVault {
         e.storage().instance().set(&Key::Active, &true);
         leave(&e);
     }
-    pub fn native_exit(e: Env, min_cash: i128) -> i128 {
+    pub fn native_exit(e: Env, min_cash: i128, request: Bytes) -> i128 {
         let c = context(&e);
         let s = settings(&e);
         let owner = Self::controller(e.clone());
         owner.require_auth();
+        assert!(request.is_empty(), "invalid_supply_exit");
         enter(&e);
         assert!(
             e.storage().instance().get(&Key::Active).unwrap_or(false) && min_cash >= 0,

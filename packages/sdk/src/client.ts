@@ -2,6 +2,7 @@ import { Contract, Networks, StrKey } from "@stellar/stellar-sdk";
 import { Spec } from "@stellar/stellar-sdk/contract";
 import { SPEC_ENTRIES, BUILD_ARTIFACTS } from "./generated/specs.js";
 import { V3_SPEC_ENTRIES, V3_BUILD_ARTIFACTS } from "./generated/specs-v3.js";
+import { V4_SPEC_ENTRIES, V4_BUILD_ARTIFACTS } from "./generated/specs-v4.js";
 import {
   TestnetClient,
   type WalletSigner,
@@ -21,6 +22,11 @@ const CONTRACT_SCHEMAS = {
   registry_v3: V3_SPEC_ENTRIES.registry,
   exit_facility: V3_SPEC_ENTRIES.exit_facility,
   spot_receipt: V3_SPEC_ENTRIES.spot_receipt,
+  tournament_v4: V4_SPEC_ENTRIES.tournament,
+  factory_v4: V4_SPEC_ENTRIES.factory,
+  registry_v4: V4_SPEC_ENTRIES.registry,
+  blend_adapter: V4_SPEC_ENTRIES.blend_adapter,
+  blend_vault: V4_SPEC_ENTRIES.blend_vault,
 };
 export type ContractKind = keyof typeof CONTRACT_SCHEMAS;
 export class BoundContract {
@@ -89,7 +95,8 @@ export function validateDeployment(input: Deployment): Deployment {
   if (
     input.protocolVersion &&
     input.protocolVersion !== "0.2.0" &&
-    input.protocolVersion !== "0.3.0"
+    input.protocolVersion !== "0.3.0" &&
+    input.protocolVersion !== "0.4.0"
   )
     throw new Error("Unsupported protocol version.");
   const url = new URL(input.rpcUrl);
@@ -108,7 +115,11 @@ export function validateDeployment(input: Deployment): Deployment {
   )
     throw new Error("Invalid public RPC configuration.");
   for (const [kind, artifact] of Object.entries(
-    input.protocolVersion === "0.3.0" ? V3_BUILD_ARTIFACTS : BUILD_ARTIFACTS,
+    input.protocolVersion === "0.4.0"
+      ? V4_BUILD_ARTIFACTS
+      : input.protocolVersion === "0.3.0"
+        ? V3_BUILD_ARTIFACTS
+        : BUILD_ARTIFACTS,
   )) {
     if (kind !== "factory" && kind !== "registry" && kind !== "tournament")
       continue;
@@ -132,7 +143,11 @@ export class LeagueClient {
   factory() {
     const d = this.deployment;
     return new BoundContract(
-      d.protocolVersion === "0.3.0" ? "factory_v3" : "factory",
+      d.protocolVersion === "0.4.0"
+        ? "factory_v4"
+        : d.protocolVersion === "0.3.0"
+          ? "factory_v3"
+          : "factory",
       d.factory.address,
       this.source,
       d.rpcUrl,
@@ -142,7 +157,11 @@ export class LeagueClient {
   registry() {
     const d = this.deployment;
     return new BoundContract(
-      "registry",
+      d.protocolVersion === "0.4.0"
+        ? "registry_v4"
+        : d.protocolVersion === "0.3.0"
+          ? "registry_v3"
+          : "registry",
       d.registry.address,
       this.source,
       d.rpcUrl,
@@ -152,7 +171,11 @@ export class LeagueClient {
   round(address: string) {
     const d = this.deployment;
     return new BoundContract(
-      d.protocolVersion === "0.3.0" ? "tournament_v3" : "tournament",
+      d.protocolVersion === "0.4.0"
+        ? "tournament_v4"
+        : d.protocolVersion === "0.3.0"
+          ? "tournament_v3"
+          : "tournament",
       address,
       this.source,
       d.rpcUrl,
@@ -219,4 +242,4 @@ export const hex = (bytes: Uint8Array) =>
   Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 export const contractKey = (address: string) =>
   new Contract(address).getFootprint();
-export { BUILD_ARTIFACTS, V3_BUILD_ARTIFACTS };
+export { BUILD_ARTIFACTS, V3_BUILD_ARTIFACTS, V4_BUILD_ARTIFACTS };

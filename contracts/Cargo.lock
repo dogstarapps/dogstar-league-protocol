@@ -561,7 +561,7 @@ dependencies = [
 
 [[package]]
 name = "dogstar-factory"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "dogstar-protocol-types",
  "soroban-sdk",
@@ -609,9 +609,11 @@ dependencies = [
 
 [[package]]
 name = "dogstar-tournament"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
+ "dogstar-external-interfaces",
  "dogstar-protocol-types",
+ "dogstar-vault-types",
  "soroban-sdk",
 ]
 

@@ -122,7 +122,7 @@ export interface RoundSnapshot {
   registrations: string[];
 }
 export interface Deployment {
-  protocolVersion?: "0.2.0" | "0.3.0";
+  protocolVersion?: "0.2.0" | "0.3.0" | "0.4.0";
   schemaVersion: 1;
   network: "TESTNET";
   rpcUrl: string;
@@ -157,3 +157,23 @@ export const PHASES = [
   "Completed",
   "Cancelled",
 ] as const;
+
+export interface ManagedPosition {
+  id: number;
+  player: string;
+  adapter: string;
+  vault: string;
+  vault_hash: Uint8Array;
+  basis: bigint;
+  open: boolean;
+}
+export interface VaultContext {
+  round: string;
+  player: string;
+  facility: string;
+  adapter: string;
+  cash: string;
+  basis: bigint;
+  quote_policy: string;
+  quote_hash: Uint8Array;
+}

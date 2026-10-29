@@ -40,6 +40,9 @@ impl Policy {
 struct Adapter;
 #[contractimpl]
 impl Adapter {
+    pub fn capabilities() -> u32 {
+        1
+    }
     pub fn ping() {}
 }
 #[contractclient(name = "RoundClient")]

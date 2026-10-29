@@ -3,10 +3,24 @@
 // Archived entries remain restorable; never prepay the network maximum on each write.
 use soroban_sdk::{
     contract, contractclient, contracterror, contractevent, contractimpl, contracttype,
-    panic_with_error, token, xdr::ToXdr, Address, BytesN, Env, Executable, IntoVal, Map, Vec, I256,
+    panic_with_error, token, xdr::ToXdr, Address, Bytes, BytesN, Env, Executable, IntoVal, Map,
+    Vec, I256,
 };
 
 pub use dogstar_protocol_types::{Calendar, Config, FacilityConfig, ReceiptInfo};
+use dogstar_protocol_types::{CAP_POSITION, CAP_SPOT};
+pub use dogstar_vault_types::VaultContext;
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ManagedPosition {
+    pub id: u32,
+    pub player: Address,
+    pub adapter: Address,
+    pub vault: Address,
+    pub vault_hash: BytesN<32>,
+    pub basis: i128,
+    pub open: bool,
+}
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Player {
@@ -93,6 +107,10 @@ enum Key {
     PlayerOrders(Address),
     OpenOrders,
     OwnerDeposits(Address),
+    Capabilities,
+    NextPosition,
+    Position(u32),
+    PlayerPositions(Address),
 }
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -127,11 +145,25 @@ pub trait Facility {
     fn adjust(e: Env, vault: Address, n: i128);
     fn release(e: Env, vault: Address);
     fn purchase(e: Env, vault: Address) -> i128;
+    fn keepalive(e: Env, vault: Option<Address>);
 }
 #[contractclient(name = "ReceiptClient")]
 pub trait Receipt {
     fn info(e: Env) -> ReceiptInfo;
     fn update(e: Env, units: i128, basis: i128);
+    fn keepalive(e: Env);
+}
+#[contractclient(name = "ManagedAdapterClient")]
+pub trait ManagedAdapter {
+    fn capabilities(e: Env) -> u32;
+    fn vault_wasm(e: Env) -> BytesN<32>;
+    fn open(e: Env, c: VaultContext, nonce: u32, minimums: Vec<i128>, request: Bytes) -> Address;
+}
+#[contractclient(name = "ManagedVaultClient")]
+pub trait ManagedVault {
+    fn info(e: Env) -> ReceiptInfo;
+    fn native_exit(e: Env, min_cash: i128, request: Bytes) -> i128;
+    fn keepalive(e: Env);
 }
 #[contractevent(topics=["phase"])]
 #[derive(Clone)]
@@ -415,6 +447,62 @@ fn active_orders(e: &Env, p: &Address) -> Vec<u32> {
         .get(&Key::PlayerOrders(p.clone()))
         .unwrap_or(Vec::new(e))
 }
+fn position_ids(e: &Env, p: &Address) -> Vec<u32> {
+    e.storage()
+        .persistent()
+        .get(&Key::PlayerPositions(p.clone()))
+        .unwrap_or(Vec::new(e))
+}
+fn finish_position(e: &Env, mut position: ManagedPosition) {
+    position.open = false;
+    let mut ids = position_ids(e, &position.player);
+    ids.remove(ids.first_index_of(position.id).unwrap());
+    store(e, &Key::PlayerPositions(position.player.clone()), &ids);
+    store(e, &Key::Position(position.id), &position);
+}
+fn entry_premium(e: &Env, n: i128) -> i128 {
+    let bps = cfg(e).exit.terms().unwrap().premium_bps as i128;
+    I256::from_i128(e, n)
+        .mul(&I256::from_i128(e, bps))
+        .add(&I256::from_i128(e, 9999))
+        .div(&I256::from_i128(e, 10000))
+        .to_i128()
+        .unwrap()
+}
+fn native_position_exit(
+    e: &Env,
+    position: ManagedPosition,
+    min_cash: i128,
+    request: Bytes,
+) -> i128 {
+    check(
+        e,
+        position.open && min_cash >= 0 && request.len() <= 16384,
+        Error::State,
+    );
+    let c = cfg(e);
+    check(
+        e,
+        wasm_hash(e, &position.vault) == position.vault_hash,
+        Error::NotAllowed,
+    );
+    let me = e.current_contract_address();
+    let cash = token::Client::new(e, &c.cash);
+    let before = cash.balance(&me);
+    let returned = ManagedVaultClient::new(e, &position.vault).native_exit(&min_cash, &request);
+    let received = cash.balance(&me) - before;
+    check(
+        e,
+        received >= min_cash
+            && returned == received
+            && !ManagedVaultClient::new(e, &position.vault).info().active,
+        Error::Funds,
+    );
+    FacilityClient::new(e, &facility(e)).release(&position.vault);
+    credit(e, &position.player, &c.cash, received);
+    finish_position(e, position);
+    received
+}
 fn remove_order(e: &Env, id: u32, p: &Address) {
     let mut own = active_orders(e, p);
     own.remove(own.first_index_of(id).unwrap());
@@ -443,6 +531,14 @@ fn swap(
             && c.assets.contains(buy)
             && sell != buy
             && c.adapters.contains(adapter)
+            && e.storage()
+                .instance()
+                .get::<Key, Map<Address, u32>>(&Key::Capabilities)
+                .unwrap()
+                .get(adapter.clone())
+                .unwrap_or(0)
+                & CAP_SPOT
+                != 0
             && n > 0,
         Error::NotAllowed,
     );
@@ -557,6 +653,7 @@ impl Tournament {
         }
         let terms: BytesN<32> = e.crypto().sha256(&c.clone().to_xdr(&e)).into();
         let mut hashes = Map::<Address, BytesN<32>>::new(&e);
+        let mut capabilities = Map::<Address, u32>::new(&e);
         for adapter in c.adapters.iter() {
             check(
                 &e,
@@ -564,8 +661,15 @@ impl Tournament {
                 Error::InvalidConfig,
             );
             hashes.set(adapter.clone(), wasm_hash(&e, &adapter));
+            capabilities.set(
+                adapter.clone(),
+                ManagedAdapterClient::new(&e, &adapter).capabilities(),
+            );
         }
         e.storage().instance().set(&Key::AdapterHashes, &hashes);
+        e.storage()
+            .instance()
+            .set(&Key::Capabilities, &capabilities);
         e.storage()
             .instance()
             .set(&Key::PolicyHash, &wasm_hash(&e, &c.quote_policy));
@@ -597,6 +701,196 @@ impl Tournament {
     }
     pub fn config(e: Env) -> Config {
         cfg(&e)
+    }
+    pub fn position(e: Env, id: u32) -> ManagedPosition {
+        e.storage().persistent().get(&Key::Position(id)).unwrap()
+    }
+    pub fn positions(e: Env, p: Address) -> Vec<ManagedPosition> {
+        let mut out = Vec::new(&e);
+        for id in position_ids(&e, &p).iter() {
+            out.push_back(Self::position(e.clone(), id));
+        }
+        out
+    }
+    pub fn open_position(
+        e: Env,
+        p: Address,
+        adapter: Address,
+        n: i128,
+        minimums: Vec<i128>,
+        request: Bytes,
+    ) -> u32 {
+        p.require_auth();
+        lock(&e);
+        is_trading(&e, true);
+        let c = cfg(&e);
+        let _ = player(&e, &p);
+        let mut t = total(&e);
+        let hashes: Map<Address, BytesN<32>> =
+            e.storage().instance().get(&Key::AdapterHashes).unwrap();
+        let caps: Map<Address, u32> = e.storage().instance().get(&Key::Capabilities).unwrap();
+        check(
+            &e,
+            n > 0
+                && c.adapters.contains(&adapter)
+                && caps.get(adapter.clone()).unwrap_or(0) & CAP_POSITION != 0
+                && hashes.get(adapter.clone()) == Some(wasm_hash(&e, &adapter))
+                && minimums.len() <= 4
+                && request.len() <= 16384,
+            Error::NotAllowed,
+        );
+        let mut ids = position_ids(&e, &p);
+        check(&e, ids.len() < 8, Error::NotAllowed);
+        check(
+            &e,
+            t.execution - t.fee_reserved
+                >= c.reward * (3 + (t.players - t.settled) as i128 * c.assets.len() as i128),
+            Error::Funds,
+        );
+        let fee = entry_premium(&e, n);
+        credit(&e, &p, &c.cash, -n);
+        credit(&e, &p, &c.cash, -fee);
+        let id: u32 = e
+            .storage()
+            .instance()
+            .get::<Key, u32>(&Key::NextPosition)
+            .unwrap_or(0)
+            .checked_add(1)
+            .unwrap();
+        let adapter_client = ManagedAdapterClient::new(&e, &adapter);
+        let vault_hash = adapter_client.vault_wasm();
+        let policy_hash: BytesN<32> = e.storage().instance().get(&Key::PolicyHash).unwrap();
+        check(
+            &e,
+            wasm_hash(&e, &c.quote_policy) == policy_hash,
+            Error::NotAllowed,
+        );
+        let context = VaultContext {
+            round: e.current_contract_address(),
+            player: p.clone(),
+            facility: facility(&e),
+            adapter: adapter.clone(),
+            cash: c.cash.clone(),
+            basis: n,
+            quote_policy: c.quote_policy.clone(),
+            quote_hash: policy_hash,
+        };
+        let cash = token::Client::new(&e, &c.cash);
+        let before = cash.balance(&e.current_contract_address());
+        cash.transfer(&e.current_contract_address(), &adapter, &n);
+        let vault = adapter_client.open(&context, &id, &minimums, &request);
+        check(
+            &e,
+            before - cash.balance(&e.current_contract_address()) == n
+                && wasm_hash(&e, &vault) == vault_hash,
+            Error::Funds,
+        );
+        let info = ManagedVaultClient::new(&e, &vault).info();
+        check(
+            &e,
+            info.controller == context.round
+                && info.round == context.round
+                && info.player == p
+                && info.cash == c.cash
+                && info.facility == context.facility
+                && info.basis == n
+                && info.active
+                && info.units > 0,
+            Error::NotAllowed,
+        );
+        let exit = c.exit.terms().unwrap();
+        FacilityClient::new(&e, &context.facility)
+            .reserve(&vault, &ratio(&e, n, exit.fallback_bps as i128, 10000));
+        if fee > 0 {
+            pay(&e, &exit.provider, fee);
+        }
+        t.fee_reserved += c.reward;
+        ids.push_back(id);
+        store(&e, &Key::PlayerPositions(p.clone()), &ids);
+        store(
+            &e,
+            &Key::Position(id),
+            &ManagedPosition {
+                id,
+                player: p,
+                adapter,
+                vault,
+                vault_hash,
+                basis: n,
+                open: true,
+            },
+        );
+        e.storage().instance().set(&Key::NextPosition, &id);
+        put_total(&e, &t);
+        unlock(&e);
+        id
+    }
+    pub fn exit_position(e: Env, p: Address, id: u32, min_cash: i128, request: Bytes) -> i128 {
+        p.require_auth();
+        lock(&e);
+        is_trading(&e, false);
+        let position = Self::position(e.clone(), id);
+        check(
+            &e,
+            position.player == p && !player(&e, &p).settled,
+            Error::NotAllowed,
+        );
+        let received = native_position_exit(&e, position, min_cash, request);
+        let mut t = total(&e);
+        t.fee_reserved -= cfg(&e).reward;
+        put_total(&e, &t);
+        unlock(&e);
+        received
+    }
+    pub fn close_position(
+        e: Env,
+        id: u32,
+        min_cash: i128,
+        request: Bytes,
+        operator: Address,
+    ) -> i128 {
+        operator.require_auth();
+        lock(&e);
+        let position = Self::position(e.clone(), id);
+        check(
+            &e,
+            phase(&e) == 4 && !player(&e, &position.player).settled,
+            Error::State,
+        );
+        let received = native_position_exit(&e, position, min_cash, request);
+        let mut t = total(&e);
+        t.fee_reserved -= cfg(&e).reward;
+        reward(&e, &operator, &mut t);
+        put_total(&e, &t);
+        unlock(&e);
+        received
+    }
+    pub fn buyout_position(e: Env, id: u32, operator: Address) -> i128 {
+        operator.require_auth();
+        lock(&e);
+        let c = cfg(&e);
+        let position = Self::position(e.clone(), id);
+        let mut t = total(&e);
+        check(
+            &e,
+            phase(&e) == 4
+                && now(&e) >= c.calendar.settle_by
+                && position.open
+                && !player(&e, &position.player).settled,
+            Error::State,
+        );
+        let cash = token::Client::new(&e, &c.cash);
+        let before = cash.balance(&e.current_contract_address());
+        let promised = FacilityClient::new(&e, &facility(&e)).purchase(&position.vault);
+        let received = cash.balance(&e.current_contract_address()) - before;
+        check(&e, received == promised, Error::Funds);
+        credit(&e, &position.player, &c.cash, received);
+        finish_position(&e, position);
+        t.fee_reserved -= c.reward;
+        reward(&e, &operator, &mut t);
+        put_total(&e, &t);
+        unlock(&e);
+        received
     }
     pub fn exit_facility(e: Env) -> Option<Address> {
         e.storage().instance().get(&Key::Facility)
@@ -1243,6 +1537,7 @@ impl Tournament {
         check(&e, phase(&e) == 4 && t.open_orders == 0, Error::State);
         let mut pl = player(&e, &p);
         check(&e, !pl.settled, Error::Consumed);
+        check(&e, position_ids(&e, &p).is_empty(), Error::Pending);
         for a in c.assets.iter() {
             if a != c.cash {
                 check(&e, balance(&e, &p, &a) == 0, Error::Pending);
@@ -1411,18 +1706,52 @@ impl Tournament {
     }
     pub fn keep_player(e: Env, p: Address) {
         let target = e.storage().max_ttl().min(120_960);
-        let keys = Vec::from_array(&e, [Key::Reg(p.clone()), Key::Player(p.clone())]);
+        let keys = Vec::from_array(
+            &e,
+            [
+                Key::Reg(p.clone()),
+                Key::Player(p.clone()),
+                Key::PlayerPositions(p.clone()),
+                Key::PlayerOrders(p.clone()),
+            ],
+        );
         for k in keys.iter() {
             if e.storage().persistent().has(&k) {
                 e.storage().persistent().extend_ttl(&k, target / 2, target);
             }
         }
         for a in cfg(&e).assets.iter() {
-            let k = Key::Balance(p.clone(), a);
+            let k = Key::Balance(p.clone(), a.clone());
             if e.storage().persistent().has(&k) {
                 e.storage().persistent().extend_ttl(&k, target / 2, target);
             }
+            let key = Key::Receipt(p.clone(), a);
+            if let Some(vault) = e.storage().persistent().get::<Key, Address>(&key) {
+                e.storage()
+                    .persistent()
+                    .extend_ttl(&key, target / 2, target);
+                ReceiptClient::new(&e, &vault).keepalive();
+                FacilityClient::new(&e, &facility(&e)).keepalive(&Some(vault));
+            }
         }
+        for id in position_ids(&e, &p).iter() {
+            Self::keep_position(e.clone(), id);
+        }
+        touch(&e);
+    }
+    pub fn keep_position(e: Env, id: u32) {
+        let target = e.storage().max_ttl().min(120_960);
+        let position = Self::position(e.clone(), id);
+        e.storage()
+            .persistent()
+            .extend_ttl(&Key::Position(id), target / 2, target);
+        check(
+            &e,
+            wasm_hash(&e, &position.vault) == position.vault_hash,
+            Error::NotAllowed,
+        );
+        ManagedVaultClient::new(&e, &position.vault).keepalive();
+        FacilityClient::new(&e, &facility(&e)).keepalive(&Some(position.vault));
         touch(&e);
     }
     pub fn keep_order(e: Env, id: u32) {

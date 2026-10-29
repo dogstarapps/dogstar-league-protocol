@@ -88,6 +88,7 @@ pub const CAP_SPOT: u32 = 1;
 pub const CAP_LP: u32 = 2;
 pub const CAP_SUPPLY: u32 = 4;
 pub const CAP_PERP: u32 = 8;
+pub const CAP_POSITION: u32 = 16;
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct ProtocolVersion {

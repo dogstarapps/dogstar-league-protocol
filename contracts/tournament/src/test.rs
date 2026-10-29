@@ -17,6 +17,9 @@ impl Policy {
 struct Adapter;
 #[contractimpl]
 impl Adapter {
+    pub fn capabilities() -> u32 {
+        1
+    }
     pub fn multiplier(e: Env, n: i128) {
         e.storage().instance().set(&1u32, &n);
     }
@@ -562,4 +565,205 @@ fn a_contributor_can_refund_a_failed_round_without_waiting_for_a_keeper() {
     assert_eq!(c.advance_reward(), 0);
     assert_eq!(c.refund(&id), 1000);
     assert_eq!(c.phase(), 6);
+}
+
+#[contract]
+struct SupplyPool;
+#[contractimpl]
+impl SupplyPool {
+    pub fn __constructor(e: Env, asset: Address) {
+        e.storage().instance().set(&0u32, &asset);
+        e.storage().instance().set(&1u32, &2i128);
+    }
+    pub fn rate(e: Env, n: i128) {
+        e.storage().instance().set(&1u32, &n);
+    }
+    pub fn freeze(e: Env, frozen: bool) {
+        e.storage().instance().set(&2u32, &frozen);
+    }
+    pub fn get_positions(
+        e: Env,
+        address: Address,
+    ) -> dogstar_external_interfaces::blend::Positions {
+        let shares: i128 = e.storage().persistent().get(&address).unwrap_or(0);
+        let mut supply = Map::new(&e);
+        if shares > 0 {
+            supply.set(0u32, shares);
+        }
+        dogstar_external_interfaces::blend::Positions {
+            collateral: Map::new(&e),
+            liabilities: Map::new(&e),
+            supply,
+        }
+    }
+    pub fn submit(
+        e: Env,
+        from: Address,
+        spender: Address,
+        to: Address,
+        requests: Vec<dogstar_external_interfaces::blend::Request>,
+    ) -> dogstar_external_interfaces::blend::Positions {
+        from.require_auth();
+        spender.require_auth();
+        to.require_auth();
+        assert!(
+            !e.storage().instance().get(&2u32).unwrap_or(false),
+            "pool_frozen"
+        );
+        let asset: Address = e.storage().instance().get(&0u32).unwrap();
+        let rate: i128 = e.storage().instance().get(&1u32).unwrap();
+        for request in requests.iter() {
+            assert!(request.address == asset, "wrong_asset");
+            if request.request_type == 0 {
+                token::Client::new(&e, &asset).transfer(
+                    &spender,
+                    &e.current_contract_address(),
+                    &request.amount,
+                );
+                e.storage()
+                    .persistent()
+                    .set(&from, &(request.amount / rate));
+            } else {
+                assert!(
+                    request.request_type == 1 && request.amount == i128::MAX,
+                    "full_supply_exit_only"
+                );
+                let shares: i128 = e.storage().persistent().get(&from).unwrap();
+                token::Client::new(&e, &asset).transfer(
+                    &e.current_contract_address(),
+                    &to,
+                    &(shares * rate),
+                );
+                e.storage().persistent().set(&from, &0i128);
+            }
+        }
+        Self::get_positions(e, from)
+    }
+}
+fn with_supply(coverage: i128) -> (Setup, Address, Address) {
+    let mut s = setup();
+    let mut config = TournamentClient::new(&s.e, &s.id).config();
+    if let dogstar_protocol_types::ExitPolicy::Covered(ref mut exit) = config.exit {
+        exit.minimum_coverage = coverage;
+    }
+    let pool = s.e.register(SupplyPool, (s.cash.clone(),));
+    StellarAssetClient::new(&s.e, &s.cash).mint(&pool, &100000);
+    let settings = dogstar_vault_types::BlendSettings {
+        cash: s.cash.clone(),
+        underlying: s.cash.clone(),
+        pool: pool.clone(),
+        pool_hash: wasm_hash(&s.e, &pool),
+        reserve_index: 0,
+        swap_adapter: s.adapter.clone(),
+        swap_hash: wasm_hash(&s.e, &s.adapter),
+        vault_wasm: s.e.deployer().upload_contract_wasm(
+            &include_bytes!("../../target/wasm32v1-none/release/dogstar_blend_vault.wasm")[..],
+        ),
+    };
+    let adapter = s.e.register(
+        &include_bytes!("../../target/wasm32v1-none/release/dogstar_blend_adapter.wasm")[..],
+        (settings,),
+    );
+    config.adapters.push_back(adapter.clone());
+    let id = s.e.register(Tournament, (config,));
+    fund_coverage(&s.e, &id, &coverage);
+    s.id = id;
+    active(&s);
+    (s, pool, adapter)
+}
+#[test]
+fn managed_supply_positions_account_real_cash_yield_and_reserve_closing_rewards() {
+    let (s, pool, adapter) = with_supply(10000);
+    let c = TournamentClient::new(&s.e, &s.id);
+    let id = c.open_position(&s.p, &adapter, &1000, &vec![&s.e, 1000], &Bytes::new(&s.e));
+    assert_eq!(c.positions(&s.p).len(), 1);
+    assert_eq!(c.balance(&s.p, &s.cash), 0);
+    assert_eq!(c.totals().fee_reserved, 1);
+    SupplyPoolClient::new(&s.e, &pool).rate(&3);
+    s.e.ledger().with_mut(|l| l.timestamp = 100);
+    c.advance(&s.op);
+    assert!(c.try_settle_player(&s.p, &s.op).is_err());
+    assert_eq!(c.close_position(&id, &1000, &Bytes::new(&s.e), &s.op), 1500);
+    assert_eq!(c.totals().fee_reserved, 0);
+    assert_eq!(c.positions(&s.p).len(), 0);
+    c.settle_player(&s.p, &s.op);
+    assert_eq!(c.player(&s.p).payout, 500);
+}
+#[test]
+fn frozen_managed_positions_settle_via_reserved_purchase_without_player_signature() {
+    use soroban_sdk::testutils::{MockAuth, MockAuthInvoke};
+    let (s, pool, adapter) = with_supply(10000);
+    let c = TournamentClient::new(&s.e, &s.id);
+    let id = c.open_position(&s.p, &adapter, &800, &vec![&s.e, 800], &Bytes::new(&s.e));
+    SupplyPoolClient::new(&s.e, &pool).freeze(&true);
+    s.e.ledger().with_mut(|l| l.timestamp = 100);
+    c.advance(&s.op);
+    assert!(c
+        .try_close_position(&id, &0, &Bytes::new(&s.e), &s.op)
+        .is_err());
+    assert!(c.try_buyout_position(&id, &s.op).is_err());
+    s.e.ledger().with_mut(|l| l.timestamp = 120);
+    s.e.mock_auths(&[MockAuth {
+        address: &s.op,
+        invoke: &MockAuthInvoke {
+            contract: &s.id,
+            fn_name: "buyout_position",
+            args: (id, s.op.clone()).into_val(&s.e),
+            sub_invokes: &[],
+        },
+    }]);
+    assert_eq!(c.buyout_position(&id, &s.op), 800);
+    assert_eq!(c.balance(&s.p, &s.cash), 1000);
+    assert_eq!(c.positions(&s.p).len(), 0);
+    let info = ManagedVaultClient::new(&s.e, &c.position(&id).vault).info();
+    assert_eq!(info.controller, s.sponsor);
+    s.e.mock_all_auths();
+    c.settle_player(&s.p, &s.op);
+    c.settle_player(&s.q, &s.op);
+    c.finalize(&s.op);
+    assert_eq!(c.phase(), 5);
+}
+#[test]
+fn insufficient_managed_coverage_reverts_deployment_pool_supply_and_cash_debit() {
+    let (s, pool, adapter) = with_supply(2000);
+    let c = TournamentClient::new(&s.e, &s.id);
+    let id = c.open_position(&s.p, &adapter, &1000, &vec![&s.e, 1000], &Bytes::new(&s.e));
+    SupplyPoolClient::new(&s.e, &pool).rate(&3);
+    assert_eq!(c.exit_position(&s.p, &id, &0, &Bytes::new(&s.e)), 1500);
+    c.open_position(&s.q, &adapter, &1000, &vec![&s.e, 1000], &Bytes::new(&s.e));
+    let before = token::Client::new(&s.e, &s.cash).balance(&s.id);
+    assert!(c
+        .try_open_position(&s.p, &adapter, &1500, &vec![&s.e, 1500], &Bytes::new(&s.e))
+        .is_err());
+    assert_eq!(c.balance(&s.p, &s.cash), 1500);
+    assert_eq!(c.positions(&s.p).len(), 0);
+    assert_eq!(token::Client::new(&s.e, &s.cash).balance(&s.id), before);
+}
+
+#[test]
+fn permissionless_player_maintenance_renews_positions_vaults_and_coverage_together() {
+    use soroban_sdk::testutils::storage::{Instance, Persistent};
+    let (s, _pool, adapter) = with_supply(10000);
+    let c = TournamentClient::new(&s.e, &s.id);
+    let id = c.open_position(&s.p, &adapter, &800, &vec![&s.e, 800], &Bytes::new(&s.e));
+    let vault = c.position(&id).vault;
+    let facility = c.exit_facility().unwrap();
+    s.e.ledger().with_mut(|l| l.sequence_number += 70000);
+    let old = s.e.as_contract(&s.id, || {
+        s.e.storage().persistent().get_ttl(&Key::Position(id))
+    });
+    s.e.mock_auths(&[]);
+    c.keep_player(&s.p);
+    s.e.as_contract(&s.id, || {
+        assert!(s.e.storage().persistent().get_ttl(&Key::Position(id)) > old);
+        assert!(
+            s.e.storage()
+                .persistent()
+                .get_ttl(&Key::PlayerPositions(s.p.clone()))
+                > old
+        );
+    });
+    assert!(s.e.as_contract(&vault, || s.e.storage().instance().get_ttl()) > old);
+    assert!(s.e.as_contract(&facility, || s.e.storage().instance().get_ttl()) > old);
+    assert_eq!(c.positions(&s.p).len(), 1);
 }

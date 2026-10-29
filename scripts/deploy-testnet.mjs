@@ -2,7 +2,7 @@ import { mkdir, readFile, writeFile, chmod } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { Asset, Keypair, Networks, rpc } from "@stellar/stellar-sdk";
-import { V3_BUILD_ARTIFACTS as BUILD_ARTIFACTS } from "../dist/sdk/src/generated/specs-v3.js";
+import { V4_BUILD_ARTIFACTS as BUILD_ARTIFACTS } from "../dist/sdk/src/generated/specs-v4.js";
 
 for (const [name, artifact] of Object.entries(BUILD_ARTIFACTS)) {
   const wasm = await readFile(
@@ -14,7 +14,7 @@ for (const [name, artifact] of Object.entries(BUILD_ARTIFACTS)) {
     );
 }
 const outputManifest =
-  process.env.DL_DEPLOYMENT_OUTPUT ?? "deployments/testnet-v3.json";
+  process.env.DL_DEPLOYMENT_OUTPUT ?? "deployments/testnet-v4.json";
 const rpcUrl =
   process.env.DL_TESTNET_RPC ?? "https://soroban-testnet.stellar.org";
 const server = new rpc.Server(rpcUrl);
@@ -26,7 +26,7 @@ await mkdir("deployments", { recursive: true });
 try {
   const existing = JSON.parse(await readFile(outputManifest, "utf8"));
   if (
-    existing.protocolVersion === "0.3.0" &&
+    existing.protocolVersion === "0.4.0" &&
     existing.factory.wasmHash === BUILD_ARTIFACTS.factory.wasmHash &&
     existing.tournament.wasmHash === BUILD_ARTIFACTS.tournament.wasmHash
   ) {
@@ -38,7 +38,7 @@ try {
     process.exit(0);
   }
   throw new Error(
-    "Preserve the existing v3 deployment and select a new versioned output before deploying changed code.",
+    "Preserve the existing deployment and select a new versioned output before deploying changed code.",
   );
 } catch (error) {
   if (error.code !== "ENOENT") throw error;
@@ -226,7 +226,7 @@ const factory = await deploy("factory", [
 ]);
 const manifest = {
   schemaVersion: 1,
-  protocolVersion: "0.3.0",
+  protocolVersion: "0.4.0",
   exitArtifacts,
   network: "TESTNET",
   environment: "testnet",
