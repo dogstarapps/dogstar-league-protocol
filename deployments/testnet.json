@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "network": "TESTNET",
+  "environment": "testnet",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "readSource": "GASI5ZPQHRTDBKWZRQL63NMOOVUKL7QFRVX6ZNZGOB4YAYVDK6WRWTIQ",
+  "registry": {
+    "address": "CDKZY6TRQTBTUVEL6VOD4XEJRZOBPK6MJ2G7CE2ITEBAI2CSVVBWNINP",
+    "wasmHash": "a5e725690923df521995baee448aa26d9df9cfc6561b8e0493232637ecfee258",
+    "interfaceHash": "cced0b4fec7bed556974a3f2931e638e96b0a3975a06f813e758be33fd32b8aa"
+  },
+  "factory": {
+    "address": "CA6RGTOEMMDGJ2EJ4YEMX5DUXT5WBDICK42TR42OLHE6PQZNHYDBKFQK",
+    "wasmHash": "c1b79a7c1bdbf6afe90124c5ad02d052c917066e994599f29cf673aeee0db660",
+    "interfaceHash": "633e52c617a3f5f6adf04014bb1d3b47e11846f4c61d83e04ae859348f6370a0"
+  },
+  "tournament": {
+    "wasmHash": "247595bc461f9365fff943ebd685a0ffeeb75860c46babcf47cc693a306a774a",
+    "interfaceHash": "b9c01304c21ffcc43b4d4967d9c358f14f9602af78d0621162c9487ed1604b77"
+  },
+  "quotePolicy": {
+    "address": "CDLTRNW2IXU4FN5IFO2FNIJWJWK5R7NJLG55XEA37ZRNYVYFYPDAV6OG",
+    "wasmHash": "8ece8aecc51748ac4baf2e13bdc1f9eb6c9d90c28243d69a8a37322cbbc2eea8"
+  },
+  "cash": {
+    "address": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+    "symbol": "XLM",
+    "decimals": 7
+  },
+  "protocols": [],
+  "deployedAt": "2026-10-29T18:11:01.131Z"
+}

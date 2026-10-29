@@ -15,6 +15,7 @@ enum Key {
     Registry,
     RoundWasm,
     QuotePolicy,
+    Cash,
     Count,
     Round(u32),
     ByAddress(Address),
@@ -34,10 +35,17 @@ pub struct RoundCreated {
 pub struct Factory;
 #[contractimpl]
 impl Factory {
-    pub fn __constructor(e: Env, registry: Address, round_wasm: BytesN<32>, quote_policy: Address) {
+    pub fn __constructor(
+        e: Env,
+        registry: Address,
+        round_wasm: BytesN<32>,
+        quote_policy: Address,
+        cash: Address,
+    ) {
         e.storage().instance().set(&Key::Registry, &registry);
         e.storage().instance().set(&Key::RoundWasm, &round_wasm);
         e.storage().instance().set(&Key::QuotePolicy, &quote_policy);
+        e.storage().instance().set(&Key::Cash, &cash);
         e.storage().instance().set(&Key::Count, &0u32);
     }
     pub fn create(
@@ -48,6 +56,8 @@ impl Factory {
         metadata_hash: BytesN<32>,
     ) -> Address {
         c.creator.require_auth();
+        let cash: Address = e.storage().instance().get(&Key::Cash).unwrap();
+        assert!(c.cash == cash, "unapproved_settlement_asset");
         assert!(
             selections.len() == c.adapters.len() && selections.len() <= 5,
             "adapter_selection_mismatch"
@@ -129,6 +139,13 @@ impl Factory {
         let n = e.storage().max_ttl();
         e.storage().instance().extend_ttl(n / 2, n);
         e.storage().instance().get(&Key::Count).unwrap()
+    }
+    pub fn find(e: Env, address: Address) -> RoundRecord {
+        let key = Key::ByAddress(address);
+        let id: u32 = e.storage().persistent().get(&key).unwrap();
+        let n = e.storage().max_ttl();
+        e.storage().persistent().extend_ttl(&key, n / 2, n);
+        Self::get(e, id)
     }
     pub fn page(e: Env, offset: u32, limit: u32) -> Vec<RoundRecord> {
         assert!(limit <= 50, "page_limit");

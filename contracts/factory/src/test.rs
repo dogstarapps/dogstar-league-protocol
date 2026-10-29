@@ -79,7 +79,10 @@ fn setup() -> Setup {
     };
     let registry = e.register(RegistryFixture, (p,));
     let wasm = e.deployer().upload_contract_wasm(ROUND_WASM);
-    let factory = e.register(Factory, (registry.clone(), wasm, policy.clone()));
+    let factory = e.register(
+        Factory,
+        (registry.clone(), wasm, policy.clone(), cash.clone()),
+    );
     let c = Config {
         creator,
         cash: cash.clone(),

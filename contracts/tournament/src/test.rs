@@ -240,3 +240,58 @@ fn an_adapter_upgrade_cannot_change_an_existing_rounds_accepted_code() {
         .is_err());
     assert_eq!(c.balance(&s.p, &s.cash), 1000);
 }
+
+fn larger_round(s: &Setup) -> (Address, Vec<Address>) {
+    let mut c = TournamentClient::new(&s.e, &s.id).config();
+    c.min_players = 6;
+    c.max_players = 6;
+    let id = s.e.register(Tournament, (c,));
+    let client = TournamentClient::new(&s.e, &id);
+    client.contribute(&s.sponsor, &0, &6000);
+    client.contribute(&s.sponsor, &1, &100);
+    client.contribute(&s.sponsor, &2, &100);
+    let mut players = Vec::new(&s.e);
+    for _ in 0..6 {
+        let p = Address::generate(&s.e);
+        client.pre_register(&p, &client.terms(), &40);
+        players.push_back(p);
+    }
+    (id, players)
+}
+#[test]
+fn preparation_is_batched_and_allocates_each_seat_once() {
+    let s = setup();
+    let (id, players) = larger_round(&s);
+    let c = TournamentClient::new(&s.e, &id);
+    s.e.ledger().with_mut(|l| l.timestamp = 30);
+    c.advance(&s.op);
+    assert_eq!(c.phase(), 1);
+    assert_eq!(c.totals().players, 5);
+    assert_eq!(c.totals().capital, 6000);
+    c.advance(&s.op);
+    assert_eq!(c.phase(), 2);
+    assert_eq!(c.totals().players, 6);
+    assert_eq!(c.totals().capital, 0);
+    assert_eq!(c.totals().execution, 98);
+    assert!(c.try_advance(&s.op).is_err());
+    for p in players.iter() {
+        assert_eq!(c.balance(&p, &s.cash), 1000);
+    }
+}
+#[test]
+fn cancelled_partial_preparation_preserves_principal_and_refunds_unused_execution() {
+    let s = setup();
+    let (id, _) = larger_round(&s);
+    let c = TournamentClient::new(&s.e, &id);
+    s.e.ledger().with_mut(|l| l.timestamp = 30);
+    c.advance(&s.op);
+    s.e.ledger().with_mut(|l| l.timestamp = 41);
+    c.advance(&s.op);
+    assert_eq!(c.phase(), 6);
+    assert_eq!(c.refund(&1), 6000);
+    assert_eq!(c.refund(&2), 100);
+    assert_eq!(c.refund(&3), 99);
+    assert_eq!(c.totals().capital, 0);
+    assert_eq!(c.totals().execution, 0);
+    assert!(c.try_refund(&3).is_err());
+}

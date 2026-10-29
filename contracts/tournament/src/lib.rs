@@ -1,7 +1,7 @@
 #![no_std]
 use soroban_sdk::{
     contract, contractclient, contracterror, contractevent, contractimpl, contracttype,
-    panic_with_error, token, xdr::ToXdr, Address, BytesN, Env, Executable, IntoVal, Map, Vec,
+    panic_with_error, token, xdr::ToXdr, Address, BytesN, Env, Executable, IntoVal, Map, Vec, I256,
 };
 
 pub use dogstar_protocol_types::{Calendar, Config};
@@ -62,6 +62,8 @@ enum Key {
     Config,
     AdapterHashes,
     PolicyHash,
+    Eligible,
+    Prepared,
     Terms,
     Phase,
     Totals,
@@ -309,7 +311,8 @@ impl Tournament {
         }
         check(
             &e,
-            c.execution >= c.reward * (3 + c.max_players as i128)
+            c.execution
+                >= c.reward * (3 + c.max_players as i128 + c.max_players.div_ceil(5) as i128)
                 && c.assets.len() <= 10
                 && c.assets.contains(&c.cash)
                 && c.adapters.len() <= 5,
@@ -402,6 +405,39 @@ impl Tournament {
     }
     pub fn order(e: Env, id: u32) -> Order {
         e.storage().persistent().get(&Key::Order(id)).unwrap()
+    }
+    pub fn contribution(e: Env, id: u32) -> Contribution {
+        e.storage()
+            .persistent()
+            .get(&Key::Contribution(id))
+            .unwrap()
+    }
+    pub fn contributions_page(e: Env, offset: u32, limit: u32) -> Vec<(u32, Contribution)> {
+        check(&e, limit <= 20, Error::InvalidConfig);
+        let count = total(&e).next_deposit;
+        let mut out = Vec::new(&e);
+        for i in offset..offset.saturating_add(limit).min(count) {
+            let id = i + 1;
+            out.push_back((id, Self::contribution(e.clone(), id)));
+        }
+        out
+    }
+    pub fn orders_page(e: Env, offset: u32, limit: u32) -> Vec<(u32, Order)> {
+        check(&e, limit <= 20, Error::InvalidConfig);
+        let count = total(&e).next_order;
+        let mut out = Vec::new(&e);
+        for i in offset..offset.saturating_add(limit).min(count) {
+            let id = i + 1;
+            out.push_back((id, Self::order(e.clone(), id)));
+        }
+        out
+    }
+    pub fn portfolio(e: Env, p: Address) -> Vec<(Address, i128)> {
+        let mut out = Vec::new(&e);
+        for a in cfg(&e).assets.iter() {
+            out.push_back((a.clone(), balance(&e, &p, &a)));
+        }
+        out
     }
     pub fn contribute(e: Env, owner: Address, bucket: u32, n: i128) -> u32 {
         owner.require_auth();
@@ -548,20 +584,37 @@ impl Tournament {
             progressed = true;
         }
         if phase(&e) == 1 && now(&e) >= c.calendar.registration_close {
-            let list: Vec<Address> = e.storage().instance().get(&Key::Registrations).unwrap();
-            let mut eligible = Vec::<Address>::new(&e);
-            for p in list.iter() {
-                let reg: Registration = e.storage().persistent().get(&Key::Reg(p.clone())).unwrap();
-                if !reg.withdrawn && reg.valid_until >= now(&e) {
-                    eligible.push_back(p);
-                }
-            }
-            if eligible.len() < c.min_players || now(&e) > c.calendar.prepare_by {
+            if now(&e) > c.calendar.prepare_by {
                 set_phase(&e, 6);
                 unlock(&e);
                 return;
             }
-            for p in eligible.iter() {
+            let eligible: Vec<Address> = if let Some(list) =
+                e.storage().instance().get(&Key::Eligible)
+            {
+                list
+            } else {
+                let list: Vec<Address> = e.storage().instance().get(&Key::Registrations).unwrap();
+                let mut eligible = Vec::new(&e);
+                for p in list.iter() {
+                    let reg: Registration =
+                        e.storage().persistent().get(&Key::Reg(p.clone())).unwrap();
+                    if !reg.withdrawn && reg.valid_until >= now(&e) {
+                        eligible.push_back(p);
+                    }
+                }
+                if eligible.len() < c.min_players {
+                    set_phase(&e, 6);
+                    unlock(&e);
+                    return;
+                }
+                e.storage().instance().set(&Key::Eligible, &eligible);
+                eligible
+            };
+            let prepared: u32 = e.storage().instance().get(&Key::Prepared).unwrap_or(0);
+            let next = (prepared + 5).min(eligible.len());
+            for i in prepared..next {
+                let p = eligible.get(i).unwrap();
                 let mut reg: Registration =
                     e.storage().persistent().get(&Key::Reg(p.clone())).unwrap();
                 reg.confirmed = true;
@@ -578,10 +631,14 @@ impl Tournament {
                 );
                 credit(&e, &p, &c.cash, c.capital);
                 t.players += 1;
-                t.capital -= c.capital;
                 t.allocated += c.capital;
             }
-            set_phase(&e, 2);
+            e.storage().instance().set(&Key::Prepared, &next);
+            reward(&e, &operator, &mut t);
+            if next == eligible.len() {
+                t.capital -= t.allocated;
+                set_phase(&e, 2);
+            }
             progressed = true;
             put_total(&e, &t);
         }
@@ -761,7 +818,11 @@ impl Tournament {
         }
         let recovery = balance(&e, &p, &c.cash);
         let gain = (recovery - c.capital).max(0);
-        pl.payout = gain * c.share_bps as i128 / 10000;
+        pl.payout = I256::from_i128(&e, gain)
+            .mul(&I256::from_i128(&e, c.share_bps as i128))
+            .div(&I256::from_i128(&e, 10000))
+            .to_i128()
+            .unwrap();
         pl.recovery = recovery;
         pl.settled = true;
         t.sponsor += recovery - pl.payout;
@@ -832,17 +893,32 @@ impl Tournament {
         x.claimed = true;
         store(&e, &Key::Contribution(id), &x);
         let mut t = total(&e);
-        if x.bucket == 0 {
-            t.capital -= x.amount
-        } else if x.bucket == 1 {
-            t.prizes -= x.amount
+        let pending: i128 = e
+            .storage()
+            .persistent()
+            .get(&Key::Weight(x.bucket))
+            .unwrap();
+        store(&e, &Key::Weight(x.bucket), &(pending - x.amount));
+        let payout = if x.bucket == 2 {
+            I256::from_i128(&e, t.execution)
+                .mul(&I256::from_i128(&e, x.amount))
+                .div(&I256::from_i128(&e, pending))
+                .to_i128()
+                .unwrap()
         } else {
-            t.execution -= x.amount
+            x.amount
+        };
+        if x.bucket == 0 {
+            t.capital -= payout
+        } else if x.bucket == 1 {
+            t.prizes -= payout
+        } else {
+            t.execution -= payout
         };
         put_total(&e, &t);
-        pay(&e, &x.owner, x.amount);
+        pay(&e, &x.owner, payout);
         unlock(&e);
-        x.amount
+        payout
     }
     // Sponsor principal and unused budgets return pro rata per deposit; last claimant receives dust.
     pub fn sponsor_claim(e: Env, id: u32) -> i128 {
@@ -868,7 +944,11 @@ impl Tournament {
         } else {
             t.execution
         };
-        let payout = pool * x.amount / pending;
+        let payout = I256::from_i128(&e, pool)
+            .mul(&I256::from_i128(&e, x.amount))
+            .div(&I256::from_i128(&e, pending))
+            .to_i128()
+            .unwrap();
         if x.bucket == 0 {
             let from = t.sponsor.min(payout);
             t.sponsor -= from;

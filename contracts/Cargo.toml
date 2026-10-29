@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["tournament", "protocol-types", "registry", "factory", "spot-adapter", "price-policy", "external-interfaces"]
+members = ["tournament", "protocol-types", "registry", "factory", "spot-adapter", "price-policy", "external-interfaces", "cash-policy"]
 [workspace.dependencies]
 soroban-sdk = "=23.0.3"
 [profile.release]
