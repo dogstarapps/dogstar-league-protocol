@@ -155,3 +155,31 @@ fn provider_funding_requires_consent_to_exact_round_terms() {
     f.fund(&100, &BytesN::from_array(&s.e, &[6; 32]));
     assert_eq!(token::Client::new(&s.e, &s.cash).balance(&s.provider), 0);
 }
+#[test]
+fn unsolicited_transfers_do_not_create_provider_commitments_or_extra_capacity() {
+    let s = setup();
+    s.e.mock_all_auths();
+    let f = ExitFacilityClient::new(&s.e, &s.facility);
+    let donor = Address::generate(&s.e);
+    StellarAssetClient::new(&s.e, &s.cash).mint(&donor, &100);
+    token::Client::new(&s.e, &s.cash).transfer(&donor, &s.facility, &100);
+    assert_eq!(f.committed(), 1000);
+    assert_eq!(f.available(), 1000);
+    ControllerClient::new(&s.e, &s.controller).reserve(&s.facility, &s.vault, &600);
+    assert_eq!(f.available(), 400);
+    s.e.ledger().with_mut(|l| l.timestamp = 80);
+    f.withdraw_free(&400);
+    assert_eq!(f.committed(), 600);
+    assert_eq!(f.available(), 0);
+    assert!(f.try_withdraw_free(&1).is_err());
+    assert_eq!(f.withdraw_surplus(), 100);
+    assert_eq!(f.committed(), 600);
+    assert_eq!(f.reserved(), 600);
+    s.e.ledger().with_mut(|l| l.timestamp = 100);
+    assert_eq!(
+        ControllerClient::new(&s.e, &s.controller).buy(&s.facility, &s.vault),
+        600
+    );
+    assert_eq!(f.committed(), 0);
+    assert_eq!(f.reserved(), 0);
+}

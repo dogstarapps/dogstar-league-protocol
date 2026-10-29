@@ -523,6 +523,7 @@ impl Tournament {
                     && exit.fallback_bps > 0
                     && exit.fallback_bps <= 10000
                     && exit.premium_bps <= 1000
+                    && exit.minimum_coverage > 0
                     && exit.minimum_coverage
                         >= ratio(
                             &e,

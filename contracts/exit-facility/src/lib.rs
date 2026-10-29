@@ -16,6 +16,7 @@ pub struct Reservation {
 enum Key {
     Config,
     Reserved,
+    Committed,
     Receipt(Address),
     Lock,
 }
@@ -78,6 +79,7 @@ impl ExitFacility {
         );
         e.storage().instance().set(&Key::Config, &c);
         e.storage().instance().set(&Key::Reserved, &0i128);
+        e.storage().instance().set(&Key::Committed, &0i128);
     }
     pub fn config(e: Env) -> FacilityConfig {
         config(&e)
@@ -85,9 +87,15 @@ impl ExitFacility {
     pub fn reserved(e: Env) -> i128 {
         e.storage().instance().get(&Key::Reserved).unwrap()
     }
+    pub fn committed(e: Env) -> i128 {
+        e.storage().instance().get(&Key::Committed).unwrap()
+    }
     pub fn available(e: Env) -> i128 {
         let c = config(&e);
-        token::Client::new(&e, &c.cash).balance(&e.current_contract_address()) - Self::reserved(e)
+        token::Client::new(&e, &c.cash)
+            .balance(&e.current_contract_address())
+            .min(Self::committed(e.clone()))
+            - Self::reserved(e)
     }
     pub fn reservation(e: Env, vault: Address) -> Reservation {
         e.storage().persistent().get(&Key::Receipt(vault)).unwrap()
@@ -103,6 +111,10 @@ impl ExitFacility {
         let before = token.balance(&me);
         token.transfer(&c.provider, &me, &n);
         assert!(token.balance(&me) - before == n, "funding_delta");
+        e.storage().instance().set(
+            &Key::Committed,
+            &Self::committed(e.clone()).checked_add(n).unwrap(),
+        );
         leave(&e);
     }
     pub fn reserve(e: Env, vault: Address, n: i128) {
@@ -198,6 +210,9 @@ impl ExitFacility {
         e.storage()
             .instance()
             .set(&Key::Reserved, &(Self::reserved(e.clone()) - r.amount));
+        e.storage()
+            .instance()
+            .set(&Key::Committed, &(Self::committed(e.clone()) - r.amount));
         if r.amount > 0 {
             token::Client::new(&e, &c.cash).transfer(
                 &e.current_contract_address(),
@@ -227,8 +242,31 @@ impl ExitFacility {
             n > 0 && n <= Self::available(e.clone()),
             "reserved_cash_cannot_be_withdrawn"
         );
+        e.storage()
+            .instance()
+            .set(&Key::Committed, &(Self::committed(e.clone()) - n));
         token::Client::new(&e, &c.cash).transfer(&e.current_contract_address(), &c.provider, &n);
         leave(&e);
+    }
+    pub fn withdraw_surplus(e: Env) -> i128 {
+        let c = config(&e);
+        c.provider.require_auth();
+        enter(&e);
+        assert!(
+            e.ledger().timestamp() >= c.risk_cutoff
+                || RoundClient::new(&e, &c.controller).phase() == 6,
+            "capacity_locked_until_cutoff"
+        );
+        let surplus = token::Client::new(&e, &c.cash).balance(&e.current_contract_address())
+            - Self::committed(e.clone());
+        assert!(surplus > 0, "no_uncommitted_surplus");
+        token::Client::new(&e, &c.cash).transfer(
+            &e.current_contract_address(),
+            &c.provider,
+            &surplus,
+        );
+        leave(&e);
+        surplus
     }
     pub fn keepalive(e: Env, vault: Option<Address>) {
         let n = e.storage().max_ttl();
