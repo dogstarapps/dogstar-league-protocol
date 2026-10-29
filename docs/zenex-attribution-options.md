@@ -29,3 +29,10 @@ This introduces explicit trust in the signing threshold for prize allocation and
 Option A retains fully on-chain protocol attribution but depends on an external integration change. Option B can support the existing market but changes the round's trust and prize-settlement model and requires explicit product agreement, implementation and review. Neither option is resolved by silently treating donated token balances as trading profit, imposing an arbitrary profit ceiling or ignoring forced exits. A complete Stellar light client for event inclusion would be a separate security-critical project, not a small adapter feature.
 
 The independent emergency purchase remains useful under either model. It transfers local ownership of the isolated vault and pays a known cash strike; it cannot promise unlimited unknown profit or unfreeze the external market.
+
+
+## Selected direction (2026-10-29)
+
+The user selected option A: settlement attribution verifiable in the contract, rather than a threshold of external ranking certifiers. A wallet balance alone cannot distinguish a forced venue payout from a donation. The required venue integration must expose authenticated cumulative per-vault cash settlement, or an equivalent enforceable callback/accounting interface covering liquidation, ADL, cancellation and ordinary settlement. It must handle payouts outside a Dogstar executor transaction.
+
+No adapter may advertise verified Zenex ranking until that real deployed interface is available and tested against the pinned market code. Fixture implementations can validate our accounting rules but do not establish that the current market supports them. Permissionless prefunded cash purchase and local residual ownership remain independent of this ranking dependency.
