@@ -27,6 +27,9 @@ const CONTRACT_SCHEMAS = {
   registry_v4: V4_SPEC_ENTRIES.registry,
   blend_adapter: V4_SPEC_ENTRIES.blend_adapter,
   blend_vault: V4_SPEC_ENTRIES.blend_vault,
+  lp_adapter: V4_SPEC_ENTRIES.lp_adapter,
+  lp_vault: V4_SPEC_ENTRIES.lp_vault,
+  direct_swap: V4_SPEC_ENTRIES.direct_swap,
 };
 export type ContractKind = keyof typeof CONTRACT_SCHEMAS;
 export class BoundContract {

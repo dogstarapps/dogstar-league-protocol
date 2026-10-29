@@ -43,7 +43,7 @@ export class TestnetClient {
     );
   }
   async prepare(method: string, args: xdr.ScVal[] = []) {
-    if (!/^[a-z_]{1,32}$/.test(method))
+    if (!/^[a-zA-Z0-9_]{1,32}$/.test(method))
       throw new Error("Invalid contract method.");
     const network = await this.server.getNetwork();
     if (network.passphrase !== Networks.TESTNET)

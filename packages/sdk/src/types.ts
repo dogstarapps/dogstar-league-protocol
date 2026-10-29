@@ -1,4 +1,36 @@
 export type ContractId = string;
+export const ProtocolCapability = {
+  Spot: 1,
+  Lp: 2,
+  Supply: 4,
+  Perp: 8,
+  Position: 16,
+} as const;
+export interface DirectSettings {
+  router: ContractId;
+  router_hash: Uint8Array;
+  factory: ContractId;
+  factory_hash: Uint8Array;
+  pair: ContractId;
+  pair_hash: Uint8Array;
+  asset0: ContractId;
+  asset1: ContractId;
+}
+export interface LpSettings {
+  cash: ContractId;
+  asset0: ContractId;
+  asset1: ContractId;
+  pair: ContractId;
+  pair_hash: Uint8Array;
+  router: ContractId;
+  router_hash: Uint8Array;
+  factory: ContractId;
+  factory_hash: Uint8Array;
+  swap_adapter: ContractId;
+  swap_hash: Uint8Array;
+  vault_wasm: Uint8Array;
+  minimum_entry_bps: number;
+}
 export interface Calendar {
   funding_open: bigint;
   funding_close: bigint;

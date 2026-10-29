@@ -1,6 +1,6 @@
 # Implementation status
 
-Development source: 0.4.0. The public protocol remains separate from the private application/backoffice. Mainnet signing is disabled.
+Development source: 0.4.1, retaining tournament ABI 0.4.0. The public protocol remains separate from the private application/backoffice. Mainnet signing is disabled.
 
 ## Verified implementation
 
@@ -20,7 +20,7 @@ The separate private application is connected to the cash Testnet deployment. It
 
 ## Remaining integration
 
-Zenex vaults, fungible LP, Mainnet venue/pool/market admission, independent common end valuation, asynchronous external payout/donation attribution, full funding/participation access modes, provider UX, installed-wallet signing checks, production deployment/monitoring and independent security/economic review remain open. Keeper rewards need actual resource/cost measurements for each admitted route. Activity/level campaigns belong to explicit eligibility and finite incentive budgets; arbitrary rounds have no global emission authority.
+Zenex vaults, LP conversion/quote/frontend integration, Mainnet venue/pool/market admission, independent common end valuation, asynchronous external payout/donation attribution, full funding/participation access modes, provider UX, installed-wallet signing checks, production deployment/monitoring and independent security/economic review remain open. Keeper rewards need actual resource/cost measurements for each admitted route. Activity/level campaigns belong to explicit eligibility and finite incentive budgets; arbitrary rounds have no global emission authority.
 
 The emergency strike is an explicit contingent purchase obligation. It is not a guarantee of unlimited unknown future profit, external protocol solvency or unfreezing. Providers accept residual/loss exposure and must price their commitments accordingly. See [exit purchase terms](exit-purchase-terms.md).
 
@@ -40,3 +40,9 @@ The official Blend v2 Testnet pool and its active XLM reserve have been read on 
 An [actual Blend Testnet lifecycle](evidence/testnet-blend-lifecycle-2026-10-29.json) completed with two players and 25 successful transactions: coverage funding, two real supplies, one normal withdrawal, a public deadline buyout, final settlement/claims, provider withdrawal of the purchased external position and withdrawal of free coverage. Capital, prizes, execution, sponsor balance and coverage commitments/reservations were all zero after claims. The external pool was healthy; an external freeze is covered by local fixture tests, not fabricated as a live event.
 
 Observed charged Testnet fees were 0.0416625 XLM for covered creation, 0.0887650 XLM for opening the first isolated supply, 0.0028215 XLM for normal withdrawal, 0.0024426 XLM for buyout and 0.0018269 XLM for one player settlement. The verification round intentionally used a 0.001-XLM operator reward and an explicit bounded maintenance allowance, so these closure tasks were not profitable at that reward. Production rewards must be priced against actual fees; the default executor refuses unprofitable signing. These observations are not Mainnet price guarantees.
+
+## Liquidity wrapper source
+
+The isolated Soroswap LP adapter/vault now implement the generic managed-position interface against the actual fetched router, factory and pair ABIs. Five additional tests passed for share/cash deltas, NAV growth, bad-mint rollback, donation accounting and frozen-router handover/provider share recovery, bringing the verified Rust test total to 47. The source adds LP schemas without changing the deployed tournament ABI. There is no admitted live LP route or live LP lifecycle yet. See [LP integration scope](lp-adapter.md) and [source evidence](evidence/lp-source-verification-2026-10-29.json).
+
+The direct Soroswap conversion adapter adds three strict-authorization tests for contract custody, recipient impersonation and low-output/frozen-route rollback. The current tested workspace contains 50 Rust tests; the SDK/executor has 38 TypeScript tests. The transport now accepts valid digit-bearing contract methods such as `token_0`, while rejecting invalid symbols and retaining the Testnet network gate. The LP/direct adapters are source implementations and have not been admitted to a live round.

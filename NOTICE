@@ -23,3 +23,12 @@ the public pool ABI fetched read-only from the Stellar mainnet pool
 CDVQVKOY2YSXS2IC7KN6MNASSHPAO7UN2UR2ON4OI2SKMFJNVAMDX6DP.
 They are interface facts, not copied protocol implementation source or binaries.
 Fund-management semantics: https://docs.blend.capital/tech-docs/core-contracts/lending-pool/fund-management
+
+Soroswap liquidity interoperability declarations
+The LP adapter's minimal router/factory/pair declarations describe the public
+Testnet ABIs fetched read-only. Reference SHA-256 hashes:
+router: 4b95bbf9caec2c6e00c786f53c5f392c2fcdb8435ac0a862ab5e0645eb65824c
+factory: 86285a9234d3f0d687eaf88efe8d5d72172b38c9a86624c9934c0cbf2aff2993
+pair: 8447525edd62f72ffaf52136358034657ea0511a8fec1cd0ebde649f86cca464
+https://docs.soroswap.finance/amm/technical-reference/deployed-addresses
+These are interface facts. No fetched implementation binary is redistributed.

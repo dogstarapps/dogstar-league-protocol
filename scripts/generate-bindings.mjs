@@ -12,6 +12,9 @@ const contracts = [
   "spot_receipt",
   "blend_adapter",
   "blend_vault",
+  "lp_adapter",
+  "lp_vault",
+  "direct_swap",
 ];
 const schemas = {};
 const artifacts = {};

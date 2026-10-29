@@ -545,6 +545,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "dogstar-direct-swap"
+version = "0.4.1"
+dependencies = [
+ "dogstar-protocol-types",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "dogstar-exit-facility"
 version = "0.3.0"
 dependencies = [
@@ -563,6 +571,33 @@ dependencies = [
 name = "dogstar-factory"
 version = "0.4.0"
 dependencies = [
+ "dogstar-protocol-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-lp-adapter"
+version = "0.4.1"
+dependencies = [
+ "dogstar-lp-types",
+ "dogstar-lp-vault",
+ "dogstar-protocol-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-lp-types"
+version = "0.4.1"
+dependencies = [
+ "dogstar-vault-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-lp-vault"
+version = "0.4.1"
+dependencies = [
+ "dogstar-lp-types",
  "dogstar-protocol-types",
  "soroban-sdk",
 ]

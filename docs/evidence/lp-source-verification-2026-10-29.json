@@ -1,0 +1,43 @@
+{
+  "checkedAt": "2026-10-29T22:29:11.424Z",
+  "network": "TESTNET",
+  "external": {
+    "router": {
+      "wasmHash": "4b95bbf9caec2c6e00c786f53c5f392c2fcdb8435ac0a862ab5e0645eb65824c",
+      "specEntries": 27
+    },
+    "factory": {
+      "wasmHash": "86285a9234d3f0d687eaf88efe8d5d72172b38c9a86624c9934c0cbf2aff2993",
+      "specEntries": 21
+    },
+    "pair": {
+      "wasmHash": "8447525edd62f72ffaf52136358034657ea0511a8fec1cd0ebde649f86cca464",
+      "specEntries": 33
+    }
+  },
+  "source": "https://raw.githubusercontent.com/soroswap/core/main/public/testnet.contracts.json",
+  "fixtureTests": 5,
+  "globalAuthorizationBypassDuringTestedOperations": false,
+  "liveLpLifecycle": false,
+  "liveAdmission": false,
+  "existingAbi4Compatible": true,
+  "notes": [
+    "Actual own wrapper WASM used in fixtures",
+    "Official third-party ABI binaries fetched read-only and not redistributed",
+    "Protocol-level market manipulation still needs economic review"
+  ],
+  "ownArtifacts": {
+    "adapter": {
+      "wasmHash": "5ead0f9f30a605743a291d3c01fc9a8f14d38e0db0a34154684fedf0eae25cd7",
+      "interfaceHash": "33fae7cd2987f488bac9a949533a5098719d76341b0a05ef76ea5ebfdd182a69"
+    },
+    "vault": {
+      "wasmHash": "05e89612d359f921b2bbad0abf4048c9e8bac1c527176cfbeabb2ef9b59f0f4b",
+      "interfaceHash": "98e70abe9ad600bd5dd9d05ac0b97d8f22a8a7107319542dfdfb820ad7e4f703"
+    },
+    "directConversion": {
+      "wasmHash": "9fc54b4c93b47ba81a94904f40fa27a194e325f1bd6ba09d393187487e674b2b",
+      "interfaceHash": "d30ac4a1db51fc0266920e12de06a83ef6b2efd914d06f98a3e53b8a62d9f788"
+    }
+  }
+}
