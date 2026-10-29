@@ -1,4 +1,6 @@
 #![no_std]
+// Renew a bounded seven-day lease at the nominal five-second ledger cadence.
+// Archived entries remain restorable; never prepay the network maximum on each write.
 pub use dogstar_protocol_types::FacilityConfig;
 use soroban_sdk::{
     contract, contractclient, contractevent, contractimpl, contracttype, token, Address, BytesN,
@@ -51,13 +53,13 @@ fn enter(e: &Env) {
 }
 fn leave(e: &Env) {
     e.storage().instance().set(&Key::Lock, &false);
-    let n = e.storage().max_ttl();
+    let n = e.storage().max_ttl().min(120_960);
     e.storage().instance().extend_ttl(n / 2, n);
 }
 fn save(e: &Env, vault: &Address, r: &Reservation) {
     let key = Key::Receipt(vault.clone());
     e.storage().persistent().set(&key, r);
-    let n = e.storage().max_ttl();
+    let n = e.storage().max_ttl().min(120_960);
     e.storage().persistent().extend_ttl(&key, n / 2, n);
 }
 fn hash(address: &Address) -> BytesN<32> {
@@ -269,7 +271,7 @@ impl ExitFacility {
         surplus
     }
     pub fn keepalive(e: Env, vault: Option<Address>) {
-        let n = e.storage().max_ttl();
+        let n = e.storage().max_ttl().min(120_960);
         e.storage().instance().extend_ttl(n / 2, n);
         if let Some(vault) = vault {
             e.storage()

@@ -18,6 +18,7 @@ const CONTRACT_SCHEMAS = {
   ...SPEC_ENTRIES,
   tournament_v3: V3_SPEC_ENTRIES.tournament,
   factory_v3: V3_SPEC_ENTRIES.factory,
+  registry_v3: V3_SPEC_ENTRIES.registry,
   exit_facility: V3_SPEC_ENTRIES.exit_facility,
   spot_receipt: V3_SPEC_ENTRIES.spot_receipt,
 };

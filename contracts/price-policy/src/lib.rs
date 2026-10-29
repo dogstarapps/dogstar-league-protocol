@@ -1,4 +1,6 @@
 #![no_std]
+// Renew a bounded seven-day lease at the nominal five-second ledger cadence.
+// Archived entries remain restorable; never prepay the network maximum on each write.
 
 use soroban_sdk::{
     contract, contractclient, contractimpl, contracttype, token, Address, BytesN, Env, Executable,
@@ -52,7 +54,7 @@ enum Key {
 pub struct PricePolicy;
 
 fn touch(e: &Env) {
-    let ttl = e.storage().max_ttl();
+    let ttl = e.storage().max_ttl().min(120_960);
     e.storage().instance().extend_ttl(ttl / 2, ttl);
 }
 fn mapped(c: &PolicyConfig, token: &Address) -> TokenFeed {

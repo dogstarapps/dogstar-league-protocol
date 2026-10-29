@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": "0.3.0",
+  "exitArtifacts": {
+    "facility_wasm": "a46fff2befaaa369a172e8e179559160421463f1bf517d2146d1ed4b463a166f",
+    "spot_receipt_wasm": "cd00884bedcfdc030ecfba8db215efe1d1ff3cf254852edf443968a3d10da1be"
+  },
+  "network": "TESTNET",
+  "environment": "testnet",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "readSource": "GASI5ZPQHRTDBKWZRQL63NMOOVUKL7QFRVX6ZNZGOB4YAYVDK6WRWTIQ",
+  "registry": {
+    "address": "CDR2DZQ4M2PW6ZCDVVFCS3UKKXSYUEW2W4MCVSNZPRJ3TFNF4NC6L7XX",
+    "wasmHash": "1aa354191e57ebebc5a1348f708b3849a923eb364c038f015f5a4b631538ef39",
+    "interfaceHash": "d68fee95a075baaed1a5a66d5dd9d691b0dbdabb34b91aea69ee92c0be3f6140"
+  },
+  "factory": {
+    "address": "CCUBYJH3Q3UIFVDJNGVYE6A473ZH5QSP64WZLUON2PTJOYQSMHQDKUG2",
+    "wasmHash": "57d88c2e8fe406a1f6088664872753b50d079d8a76631ac7a4da2a4011cc89de",
+    "interfaceHash": "33ff60d30606efc0131916eddf259238aac1d31999cba3c4b71b5cf595700f8c"
+  },
+  "tournament": {
+    "wasmHash": "cd884d6cda055cfd9fde891517f69e344eaefafe4bd012f58142a24c86d60533",
+    "interfaceHash": "6d30c41bc191206fc0ace830e9ea0cf60cfb6951e489b78bc5005e0cf5f59dc4"
+  },
+  "quotePolicy": {
+    "address": "CDLTRNW2IXU4FN5IFO2FNIJWJWK5R7NJLG55XEA37ZRNYVYFYPDAV6OG",
+    "wasmHash": "8ece8aecc51748ac4baf2e13bdc1f9eb6c9d90c28243d69a8a37322cbbc2eea8"
+  },
+  "cash": {
+    "address": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+    "symbol": "XLM",
+    "decimals": 7
+  },
+  "protocols": [],
+  "deployedAt": "2026-10-29T20:40:01.453Z"
+}

@@ -184,31 +184,31 @@ export const V3_SPEC_ENTRIES = {
 } as const;
 export const V3_BUILD_ARTIFACTS = {
   "tournament": {
-    "wasmHash": "cd884d6cda055cfd9fde891517f69e344eaefafe4bd012f58142a24c86d60533",
+    "wasmHash": "85925ce4c7a3755c441a4c07a6ae4e02051cd1224813603343647c7d9dc8f337",
     "interfaceHash": "6d30c41bc191206fc0ace830e9ea0cf60cfb6951e489b78bc5005e0cf5f59dc4"
   },
   "registry": {
-    "wasmHash": "1aa354191e57ebebc5a1348f708b3849a923eb364c038f015f5a4b631538ef39",
+    "wasmHash": "fcebfa189e7f2a0cb6dcc4945f4ae53c7edb98cf48a83e458bb7877f2c126ba5",
     "interfaceHash": "d68fee95a075baaed1a5a66d5dd9d691b0dbdabb34b91aea69ee92c0be3f6140"
   },
   "factory": {
-    "wasmHash": "57d88c2e8fe406a1f6088664872753b50d079d8a76631ac7a4da2a4011cc89de",
+    "wasmHash": "fec4ab1d7148f782b9adc49a1d8c294b58d8ccde5b54ba83335ba7db91cdceed",
     "interfaceHash": "33ff60d30606efc0131916eddf259238aac1d31999cba3c4b71b5cf595700f8c"
   },
   "spot_adapter": {
-    "wasmHash": "7c3137d7125e3332037d77c8e25f41d12a9ef95898385d2fc1742d7b21f25553",
+    "wasmHash": "a0be3e48a6b24049c17cdebd3e484feb04327fea1cdf673ac7dd76271e7c3ffb",
     "interfaceHash": "746f26bf1e2df1e416a9af54e60f9aae8d20abe4692b3b83fd374b74ed059822"
   },
   "price_policy": {
-    "wasmHash": "18a78a7f71f726ba69a4b32d489d4fdabfcca65cf955c0fc4ed63624ad445323",
+    "wasmHash": "2db366db53770bf86b6013ba83e2cf96162b67ac9f6be99eb435a345418b4e0a",
     "interfaceHash": "375d424e0af09644ae119cbe30aa82377ea86b5aba310829ea8b873be3a2c259"
   },
   "exit_facility": {
-    "wasmHash": "a46fff2befaaa369a172e8e179559160421463f1bf517d2146d1ed4b463a166f",
+    "wasmHash": "86fb3c0b58dec6c2bc2fb856a1de394945edda38384c093277a29470c6ffb6fa",
     "interfaceHash": "fd523152c3444f723dad4fd577d50853fef73cea3844267180f60c38d9043e86"
   },
   "spot_receipt": {
-    "wasmHash": "cd00884bedcfdc030ecfba8db215efe1d1ff3cf254852edf443968a3d10da1be",
+    "wasmHash": "86816b6e8144985ca6bd0165cdae9c8cca568c7b9922313a9998d5fdbb8cf2bc",
     "interfaceHash": "58b8d8684dd77945329d34e3cba324234f7bc229aea830422faf386073acf7d1"
   }
 } as const;

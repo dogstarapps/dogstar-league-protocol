@@ -23,3 +23,10 @@ The separate private application is connected to the cash Testnet deployment. It
 Real isolated Blend supply and Zenex vaults, fungible LP, live venue/pool/market admission, independent common end valuation, asynchronous external payout/donation attribution, full funding/participation access modes, provider UX, installed-wallet signing checks, production deployment/monitoring and independent security/economic review remain open. Keeper rewards need actual resource/cost measurements for each admitted route. Activity/level campaigns belong to explicit eligibility and finite incentive budgets; arbitrary rounds have no global emission authority.
 
 The emergency strike is an explicit contingent purchase obligation. It is not a guarantee of unlimited unknown future profit, external protocol solvency or unfreezing. Providers accept residual/loss exposure and must price their commitments accordingly. See [exit purchase terms](exit-purchase-terms.md).
+
+
+## Resource cost and supply-vault work
+
+The maximum-TTL write policy produced an observed 244.8589295 XLM Testnet creation estimate. Bounded renewable leases reduced the comparable estimate to 0.0311369 XLM. Neither estimate is a Mainnet fee guarantee. The rejected high-fee attempt was not signed or submitted. Leases are nominally seven days at a five-second ledger cadence; persistent entries remain restorable and require maintenance/restoration integration for long inactive periods.
+
+A standalone Blend supply adapter and per-position vault now compile against the actual fetched pool ABI. They use supply/withdraw request kinds 0/1, track actual internal b-share quantities, reject debt/collateral, measure withdrawal and conversion deltas, exclude idle donated cash from competitive recovery and support local handover while the pool is unavailable. Three fixture tests passed without a global authorization bypass during actual supply/withdrawal calls. They are not yet integrated into tournament position accounting or admitted as a live venue. Incentive-token claims after normal exit belong to the player; they are separate from competitive cash return.

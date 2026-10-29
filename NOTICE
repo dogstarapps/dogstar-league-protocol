@@ -16,3 +16,10 @@ https://reflector.network/docs/interface
 
 Stellar SDK and Soroban SDK are provided by Stellar Development Foundation and
 their respective contributors under their dependency licenses.
+
+Blend interoperability declarations
+The minimal Request/Positions/submit/get_positions/claim declarations describe
+the public pool ABI fetched read-only from the Stellar mainnet pool
+CDVQVKOY2YSXS2IC7KN6MNASSHPAO7UN2UR2ON4OI2SKMFJNVAMDX6DP.
+They are interface facts, not copied protocol implementation source or binaries.
+Fund-management semantics: https://docs.blend.capital/tech-docs/core-contracts/lending-pool/fund-management

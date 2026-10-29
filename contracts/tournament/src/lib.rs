@@ -1,4 +1,6 @@
 #![no_std]
+// Renew a bounded seven-day lease at the nominal five-second ledger cadence.
+// Archived entries remain restorable; never prepay the network maximum on each write.
 use soroban_sdk::{
     contract, contractclient, contracterror, contractevent, contractimpl, contracttype,
     panic_with_error, token, xdr::ToXdr, Address, BytesN, Env, Executable, IntoVal, Map, Vec, I256,
@@ -213,12 +215,12 @@ fn now(e: &Env) -> u64 {
     e.ledger().timestamp()
 }
 fn touch(e: &Env) {
-    let target = e.storage().max_ttl();
+    let target = e.storage().max_ttl().min(120_960);
     e.storage().instance().extend_ttl(target / 2, target);
 }
 fn store<T: IntoVal<Env, soroban_sdk::Val>>(e: &Env, k: &Key, v: &T) {
     e.storage().persistent().set(k, v);
-    let target = e.storage().max_ttl();
+    let target = e.storage().max_ttl().min(120_960);
     e.storage().persistent().extend_ttl(k, target / 2, target);
 }
 fn balance(e: &Env, p: &Address, a: &Address) -> i128 {
@@ -1408,7 +1410,7 @@ impl Tournament {
         touch(&e);
     }
     pub fn keep_player(e: Env, p: Address) {
-        let target = e.storage().max_ttl();
+        let target = e.storage().max_ttl().min(120_960);
         let keys = Vec::from_array(&e, [Key::Reg(p.clone()), Key::Player(p.clone())]);
         for k in keys.iter() {
             if e.storage().persistent().has(&k) {
@@ -1424,14 +1426,14 @@ impl Tournament {
         touch(&e);
     }
     pub fn keep_order(e: Env, id: u32) {
-        let target = e.storage().max_ttl();
+        let target = e.storage().max_ttl().min(120_960);
         e.storage()
             .persistent()
             .extend_ttl(&Key::Order(id), target / 2, target);
         touch(&e);
     }
     pub fn keep_deposit(e: Env, id: u32) {
-        let target = e.storage().max_ttl();
+        let target = e.storage().max_ttl().min(120_960);
         e.storage()
             .persistent()
             .extend_ttl(&Key::Contribution(id), target / 2, target);

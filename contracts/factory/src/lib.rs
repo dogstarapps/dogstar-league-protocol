@@ -1,4 +1,6 @@
 #![no_std]
+// Renew a bounded seven-day lease at the nominal five-second ledger cadence.
+// Archived entries remain restorable; never prepay the network maximum on each write.
 use dogstar_protocol_types::{
     Config, ExitArtifacts, ProtocolSelection, ProtocolVersion, RoundRecord,
 };
@@ -128,7 +130,7 @@ impl Factory {
             .persistent()
             .set(&Key::ByAddress(address.clone()), &id);
         e.storage().persistent().set(&salt_key, &address);
-        let n = e.storage().max_ttl();
+        let n = e.storage().max_ttl().min(120_960);
         for key in [k, salt_key, Key::ByAddress(address.clone())] {
             e.storage().persistent().extend_ttl(&key, n / 2, n);
         }
@@ -146,20 +148,20 @@ impl Factory {
     pub fn get(e: Env, id: u32) -> RoundRecord {
         let k = Key::Round(id);
         let r = e.storage().persistent().get(&k).unwrap();
-        let n = e.storage().max_ttl();
+        let n = e.storage().max_ttl().min(120_960);
         e.storage().persistent().extend_ttl(&k, n / 2, n);
         e.storage().instance().extend_ttl(n / 2, n);
         r
     }
     pub fn count(e: Env) -> u32 {
-        let n = e.storage().max_ttl();
+        let n = e.storage().max_ttl().min(120_960);
         e.storage().instance().extend_ttl(n / 2, n);
         e.storage().instance().get(&Key::Count).unwrap()
     }
     pub fn find(e: Env, address: Address) -> RoundRecord {
         let key = Key::ByAddress(address);
         let id: u32 = e.storage().persistent().get(&key).unwrap();
-        let n = e.storage().max_ttl();
+        let n = e.storage().max_ttl().min(120_960);
         e.storage().persistent().extend_ttl(&key, n / 2, n);
         Self::get(e, id)
     }

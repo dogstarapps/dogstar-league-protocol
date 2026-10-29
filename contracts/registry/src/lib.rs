@@ -1,4 +1,6 @@
 #![no_std]
+// Renew a bounded seven-day lease at the nominal five-second ledger cadence.
+// Archived entries remain restorable; never prepay the network maximum on each write.
 use dogstar_protocol_types::{ProtocolSelection, ProtocolVersion};
 use soroban_sdk::{
     contract, contractevent, contractimpl, contracttype, Address, BytesN, Env, Executable, Symbol,
@@ -26,7 +28,7 @@ pub struct ProtocolAdmitted {
 #[contract]
 pub struct Registry;
 fn ttl(e: &Env, k: &Key) {
-    let n = e.storage().max_ttl();
+    let n = e.storage().max_ttl().min(120_960);
     e.storage().persistent().extend_ttl(k, n / 2, n);
     e.storage().instance().extend_ttl(n / 2, n);
 }
@@ -107,7 +109,7 @@ impl Registry {
         out
     }
     pub fn count(e: Env) -> u32 {
-        let n = e.storage().max_ttl();
+        let n = e.storage().max_ttl().min(120_960);
         e.storage().instance().extend_ttl(n / 2, n);
         e.storage().instance().get(&Key::Count).unwrap()
     }

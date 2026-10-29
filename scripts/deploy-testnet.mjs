@@ -13,6 +13,8 @@ for (const [name, artifact] of Object.entries(BUILD_ARTIFACTS)) {
       "Regenerate bindings from the current WASM before deployment: " + name,
     );
 }
+const outputManifest =
+  process.env.DL_DEPLOYMENT_OUTPUT ?? "deployments/testnet-v3.json";
 const rpcUrl =
   process.env.DL_TESTNET_RPC ?? "https://soroban-testnet.stellar.org";
 const server = new rpc.Server(rpcUrl);
@@ -22,9 +24,7 @@ await mkdir(".local", { recursive: true, mode: 0o700 });
 await mkdir(".local/stellar", { recursive: true, mode: 0o700 });
 await mkdir("deployments", { recursive: true });
 try {
-  const existing = JSON.parse(
-    await readFile("deployments/testnet-v3.json", "utf8"),
-  );
+  const existing = JSON.parse(await readFile(outputManifest, "utf8"));
   if (
     existing.protocolVersion === "0.3.0" &&
     existing.factory.wasmHash === BUILD_ARTIFACTS.factory.wasmHash &&
@@ -32,7 +32,7 @@ try {
   ) {
     console.log(
       JSON.stringify({
-        deploymentAlreadyRecorded: "deployments/testnet-v3.json",
+        deploymentAlreadyRecorded: outputManifest,
       }),
     );
     process.exit(0);
@@ -208,7 +208,9 @@ for (const name of ["exit_facility", "spot_receipt"]) {
   const hash = uploaded.match(/\b[a-f0-9]{64}\b/)?.[0];
   if (hash !== BUILD_ARTIFACTS[name].wasmHash)
     throw new Error("Exit WASM differs from generated artifacts: " + name);
-  exitArtifacts[name + "_wasm"] = hash;
+  exitArtifacts[
+    name === "exit_facility" ? "facility_wasm" : "spot_receipt_wasm"
+  ] = hash;
 }
 const factory = await deploy("factory", [
   "--registry",
@@ -241,14 +243,12 @@ const manifest = {
   protocols: [],
   deployedAt: new Date().toISOString(),
 };
-await writeFile(
-  "deployments/testnet-v3.json",
-  JSON.stringify(manifest, null, 2) + "\n",
-  { flag: "wx" },
-);
+await writeFile(outputManifest, JSON.stringify(manifest, null, 2) + "\n", {
+  flag: "wx",
+});
 console.log(
   JSON.stringify({
-    manifest: "deployments/testnet-v3.json",
+    manifest: outputManifest,
     network: "TESTNET",
     operator: actors.operator.publicKey(),
     protocolsAdmitted: 0,

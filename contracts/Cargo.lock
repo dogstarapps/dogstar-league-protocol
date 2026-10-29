@@ -518,6 +518,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "dogstar-blend-adapter"
+version = "0.4.0"
+dependencies = [
+ "dogstar-external-interfaces",
+ "dogstar-protocol-types",
+ "dogstar-vault-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-blend-vault"
+version = "0.4.0"
+dependencies = [
+ "dogstar-external-interfaces",
+ "dogstar-protocol-types",
+ "dogstar-vault-types",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "dogstar-cash-policy"
 version = "0.3.0"
 dependencies = [
@@ -592,6 +612,13 @@ name = "dogstar-tournament"
 version = "0.3.0"
 dependencies = [
  "dogstar-protocol-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-vault-types"
+version = "0.4.0"
+dependencies = [
  "soroban-sdk",
 ]
 

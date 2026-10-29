@@ -1,4 +1,6 @@
 #![no_std]
+// Renew a bounded seven-day lease at the nominal five-second ledger cadence.
+// Archived entries remain restorable; never prepay the network maximum on each write.
 pub use dogstar_protocol_types::ReceiptInfo;
 use soroban_sdk::{contract, contractclient, contractimpl, contracttype, Address, Env};
 #[contracttype]
@@ -17,7 +19,7 @@ fn info(e: &Env) -> ReceiptInfo {
 }
 fn save(e: &Env, r: &ReceiptInfo) {
     e.storage().instance().set(&Key::Info, r);
-    let n = e.storage().max_ttl();
+    let n = e.storage().max_ttl().min(120_960);
     e.storage().instance().extend_ttl(n / 2, n);
 }
 #[contractimpl]
@@ -36,7 +38,7 @@ impl SpotReceipt {
         info(&e).controller
     }
     pub fn keepalive(e: Env) {
-        let n = e.storage().max_ttl();
+        let n = e.storage().max_ttl().min(120_960);
         e.storage().instance().extend_ttl(n / 2, n);
     }
     pub fn update(e: Env, units: i128, basis: i128) {
