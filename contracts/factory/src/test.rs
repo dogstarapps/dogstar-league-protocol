@@ -1,5 +1,5 @@
 use super::*;
-use dogstar_protocol_types::Calendar;
+use dogstar_protocol_types::{Calendar, ExitPolicy, ExitTerms};
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
     vec,
@@ -79,12 +79,26 @@ fn setup() -> Setup {
     };
     let registry = e.register(RegistryFixture, (p,));
     let wasm = e.deployer().upload_contract_wasm(ROUND_WASM);
+    let artifacts = ExitArtifacts {
+        facility_wasm: e.deployer().upload_contract_wasm(
+            &include_bytes!("../../target/wasm32v1-none/release/dogstar_exit_facility.wasm")[..],
+        ),
+        spot_receipt_wasm: e.deployer().upload_contract_wasm(
+            &include_bytes!("../../target/wasm32v1-none/release/dogstar_spot_receipt.wasm")[..],
+        ),
+    };
     let factory = e.register(
         Factory,
-        (registry.clone(), wasm, policy.clone(), cash.clone()),
+        (
+            registry.clone(),
+            wasm,
+            policy.clone(),
+            cash.clone(),
+            artifacts.clone(),
+        ),
     );
     let c = Config {
-        creator,
+        creator: creator.clone(),
         cash: cash.clone(),
         assets: vec![&e, cash],
         adapters: vec![&e, adapter],
@@ -96,6 +110,13 @@ fn setup() -> Setup {
         prizes: 100,
         execution: 100,
         reward: 1,
+        exit: ExitPolicy::Covered(ExitTerms {
+            provider: creator,
+            fallback_bps: 10000,
+            premium_bps: 0,
+            minimum_coverage: 2000,
+            artifacts,
+        }),
         calendar: Calendar {
             funding_open: 1,
             funding_close: 20,

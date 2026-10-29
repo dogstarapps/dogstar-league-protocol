@@ -1,5 +1,7 @@
 #![no_std]
-use dogstar_protocol_types::{Config, ProtocolSelection, ProtocolVersion, RoundRecord};
+use dogstar_protocol_types::{
+    Config, ExitArtifacts, ProtocolSelection, ProtocolVersion, RoundRecord,
+};
 use soroban_sdk::{
     contract, contractclient, contractevent, contractimpl, contracttype, xdr::ToXdr, Address,
     BytesN, Env, Symbol, Vec,
@@ -16,6 +18,7 @@ enum Key {
     RoundWasm,
     QuotePolicy,
     Cash,
+    ExitArtifacts,
     Count,
     Round(u32),
     ByAddress(Address),
@@ -41,11 +44,15 @@ impl Factory {
         round_wasm: BytesN<32>,
         quote_policy: Address,
         cash: Address,
+        exit_artifacts: ExitArtifacts,
     ) {
         e.storage().instance().set(&Key::Registry, &registry);
         e.storage().instance().set(&Key::RoundWasm, &round_wasm);
         e.storage().instance().set(&Key::QuotePolicy, &quote_policy);
         e.storage().instance().set(&Key::Cash, &cash);
+        e.storage()
+            .instance()
+            .set(&Key::ExitArtifacts, &exit_artifacts);
         e.storage().instance().set(&Key::Count, &0u32);
     }
     pub fn create(
@@ -58,6 +65,15 @@ impl Factory {
         c.creator.require_auth();
         let cash: Address = e.storage().instance().get(&Key::Cash).unwrap();
         assert!(c.cash == cash, "unapproved_settlement_asset");
+        let approved: ExitArtifacts = e.storage().instance().get(&Key::ExitArtifacts).unwrap();
+        if let Some(exit) = c.exit.terms() {
+            assert!(approved == exit.artifacts, "unapproved_exit_contracts");
+        } else {
+            assert!(
+                c.adapters.is_empty() && c.assets.len() == 1,
+                "exit_coverage_required"
+            );
+        }
         assert!(
             selections.len() == c.adapters.len() && selections.len() <= 5,
             "adapter_selection_mismatch"

@@ -29,6 +29,59 @@ pub struct Config {
     pub prizes: i128,
     pub execution: i128,
     pub reward: i128,
+    pub exit: ExitPolicy,
+}
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum ExitPolicy {
+    CashOnly,
+    Covered(ExitTerms),
+}
+impl ExitPolicy {
+    pub fn terms(&self) -> Option<&ExitTerms> {
+        match self {
+            Self::CashOnly => None,
+            Self::Covered(terms) => Some(terms),
+        }
+    }
+}
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExitArtifacts {
+    pub facility_wasm: BytesN<32>,
+    pub spot_receipt_wasm: BytesN<32>,
+}
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ExitTerms {
+    pub provider: Address,
+    pub fallback_bps: u32,
+    pub premium_bps: u32,
+    pub minimum_coverage: i128,
+    pub artifacts: ExitArtifacts,
+}
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FacilityConfig {
+    pub cash: Address,
+    pub controller: Address,
+    pub provider: Address,
+    pub risk_cutoff: u64,
+    pub purchase_at: u64,
+    pub round_terms: BytesN<32>,
+}
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct ReceiptInfo {
+    pub controller: Address,
+    pub round: Address,
+    pub facility: Address,
+    pub player: Address,
+    pub cash: Address,
+    pub asset: Address,
+    pub units: i128,
+    pub basis: i128,
+    pub active: bool,
 }
 use soroban_sdk::{BytesN, Symbol};
 pub const CAP_SPOT: u32 = 1;

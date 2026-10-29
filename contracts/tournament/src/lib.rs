@@ -4,7 +4,7 @@ use soroban_sdk::{
     panic_with_error, token, xdr::ToXdr, Address, BytesN, Env, Executable, IntoVal, Map, Vec, I256,
 };
 
-pub use dogstar_protocol_types::{Calendar, Config};
+pub use dogstar_protocol_types::{Calendar, Config, FacilityConfig, ReceiptInfo};
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Player {
@@ -30,6 +30,15 @@ pub struct Order {
     pub minimum: i128,
     pub expires: u64,
     pub open: bool,
+    pub premium: i128,
+}
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Residual {
+    pub owner: Address,
+    pub asset: Address,
+    pub units: i128,
+    pub claimed: bool,
 }
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -75,6 +84,13 @@ enum Key {
     Contribution(u32),
     Weight(u32),
     Lock,
+    Facility,
+    ReceiptNonce,
+    Receipt(Address, Address),
+    Residual(Address),
+    PlayerOrders(Address),
+    OpenOrders,
+    OwnerDeposits(Address),
 }
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -101,6 +117,19 @@ pub trait QuotePolicy {
 #[contractclient(name = "SwapClient")]
 pub trait SwapAdapter {
     fn swap(env: Env, sell: Address, buy: Address, amount: i128, minimum: i128, recipient: Address);
+}
+#[contractclient(name = "FacilityClient")]
+pub trait Facility {
+    fn available(e: Env) -> i128;
+    fn reserve(e: Env, vault: Address, n: i128);
+    fn adjust(e: Env, vault: Address, n: i128);
+    fn release(e: Env, vault: Address);
+    fn purchase(e: Env, vault: Address) -> i128;
+}
+#[contractclient(name = "ReceiptClient")]
+pub trait Receipt {
+    fn info(e: Env) -> ReceiptInfo;
+    fn update(e: Env, units: i128, basis: i128);
 }
 #[contractevent(topics=["phase"])]
 #[derive(Clone)]
@@ -143,6 +172,13 @@ pub struct SettledEvent {
     pub player: Address,
     pub recovery: i128,
     pub payout: i128,
+}
+#[contractevent(topics=["execution_reward"])]
+#[derive(Clone)]
+pub struct RewardPaid {
+    #[topic]
+    pub operator: Address,
+    pub amount: i128,
 }
 #[contract]
 pub struct Tournament;
@@ -228,6 +264,19 @@ fn reward(e: &Env, operator: &Address, t: &mut Totals) {
     t.execution -= cfg(e).reward;
     put_total(e, t);
     pay(e, operator, cfg(e).reward);
+    RewardPaid {
+        operator: operator.clone(),
+        amount: cfg(e).reward,
+    }
+    .publish(e);
+}
+fn activation_funded(e: &Env, c: &Config, t: &Totals) -> bool {
+    t.capital >= c.capital * c.max_players as i128
+        && t.prizes >= c.prizes
+        && t.execution >= c.execution
+        && !c.exit.terms().is_some_and(|exit| {
+            FacilityClient::new(e, &facility(e)).available() < exit.minimum_coverage
+        })
 }
 fn is_trading(e: &Env, increase: bool) {
     let c = cfg(e);
@@ -243,6 +292,138 @@ fn is_trading(e: &Env, increase: bool) {
                 },
         Error::Window,
     );
+}
+fn facility(e: &Env) -> Address {
+    e.storage().instance().get(&Key::Facility).unwrap()
+}
+fn ratio(e: &Env, amount: i128, numerator: i128, denominator: i128) -> i128 {
+    I256::from_i128(e, amount)
+        .mul(&I256::from_i128(e, numerator))
+        .div(&I256::from_i128(e, denominator))
+        .to_i128()
+        .unwrap()
+}
+fn premium(e: &Env, sell: &Address, buy: &Address, n: i128) -> i128 {
+    let c = cfg(e);
+    if sell != &c.cash || buy == &c.cash {
+        return 0;
+    }
+    let bps = c.exit.terms().unwrap().clone().premium_bps as i128;
+    // Round up the disclosed premium, so splitting a trade cannot waive it.
+    I256::from_i128(e, n)
+        .mul(&I256::from_i128(e, bps))
+        .add(&I256::from_i128(e, 9999))
+        .div(&I256::from_i128(e, 10000))
+        .to_i128()
+        .unwrap()
+}
+fn update_receipt(e: &Env, p: &Address, asset: &Address, units: i128, basis: i128) {
+    let c = cfg(e);
+    let exit = c.exit.terms().unwrap().clone();
+    let facility = facility(e);
+    let key = Key::Receipt(p.clone(), asset.clone());
+    let previous: Option<Address> = e.storage().persistent().get(&key);
+    if let Some(vault) = previous {
+        ReceiptClient::new(e, &vault).update(&units, &basis);
+        if units == 0 {
+            FacilityClient::new(e, &facility).release(&vault);
+            e.storage().persistent().remove(&key);
+        } else {
+            FacilityClient::new(e, &facility)
+                .adjust(&vault, &ratio(e, basis, exit.fallback_bps as i128, 10000));
+            store(e, &key, &vault);
+        }
+    } else if units > 0 {
+        let nonce: u32 = e.storage().instance().get(&Key::ReceiptNonce).unwrap_or(0);
+        let salt: BytesN<32> = e
+            .crypto()
+            .sha256(&(p.clone(), asset.clone(), nonce).to_xdr(e))
+            .into();
+        let info = ReceiptInfo {
+            controller: e.current_contract_address(),
+            round: e.current_contract_address(),
+            facility: facility.clone(),
+            player: p.clone(),
+            cash: c.cash,
+            asset: asset.clone(),
+            units,
+            basis,
+            active: true,
+        };
+        let vault = e
+            .deployer()
+            .with_current_contract(salt)
+            .deploy_v2(exit.artifacts.spot_receipt_wasm, (info,));
+        e.storage()
+            .instance()
+            .set(&Key::ReceiptNonce, &nonce.checked_add(1).unwrap());
+        FacilityClient::new(e, &facility)
+            .reserve(&vault, &ratio(e, basis, exit.fallback_bps as i128, 10000));
+        store(e, &key, &vault);
+    }
+}
+fn account_swap(e: &Env, p: &Address, sell: &Address, buy: &Address, n: i128, received: i128) {
+    let c = cfg(e);
+    let carried_basis = if sell == &c.cash {
+        n
+    } else {
+        let vault: Address = e
+            .storage()
+            .persistent()
+            .get(&Key::Receipt(p.clone(), sell.clone()))
+            .unwrap();
+        let r = ReceiptClient::new(e, &vault).info();
+        check(
+            e,
+            r.units >= n && r.active && r.controller == e.current_contract_address(),
+            Error::State,
+        );
+        let basis = ratio(e, r.basis, n, r.units);
+        update_receipt(e, p, sell, r.units - n, r.basis - basis);
+        basis
+    };
+    if buy != &c.cash {
+        let vault: Option<Address> = e
+            .storage()
+            .persistent()
+            .get(&Key::Receipt(p.clone(), buy.clone()));
+        let (units, basis) = vault
+            .map(|v| {
+                let r = ReceiptClient::new(e, &v).info();
+                (r.units, r.basis)
+            })
+            .unwrap_or((0, 0));
+        update_receipt(
+            e,
+            p,
+            buy,
+            units.checked_add(received).unwrap(),
+            basis.checked_add(carried_basis).unwrap(),
+        );
+    }
+    let fee = premium(e, sell, buy, n);
+    if fee > 0 {
+        credit(e, p, &c.cash, -fee);
+        pay(e, &c.exit.terms().unwrap().clone().provider, fee);
+    }
+}
+fn active_orders(e: &Env, p: &Address) -> Vec<u32> {
+    e.storage()
+        .persistent()
+        .get(&Key::PlayerOrders(p.clone()))
+        .unwrap_or(Vec::new(e))
+}
+fn remove_order(e: &Env, id: u32, p: &Address) {
+    let mut own = active_orders(e, p);
+    own.remove(own.first_index_of(id).unwrap());
+    store(e, &Key::PlayerOrders(p.clone()), &own);
+    let mut all: Vec<u32> = e
+        .storage()
+        .instance()
+        .get(&Key::OpenOrders)
+        .unwrap_or(Vec::new(e));
+    all.remove(all.first_index_of(id).unwrap());
+    e.storage().instance().set(&Key::OpenOrders, &all);
 }
 fn swap(
     e: &Env,
@@ -282,6 +463,7 @@ fn swap(
     let received = token::Client::new(e, buy).balance(&address) - before;
     check(e, received >= min_out, Error::Price);
     credit(e, p, buy, received);
+    account_swap(e, p, sell, buy, n, received);
     received
 }
 #[contractimpl]
@@ -298,6 +480,7 @@ impl Tournament {
                 && c.execution >= 0
                 && c.execution < (1i128 << 50)
                 && c.reward >= 0
+                && c.reward < (1i128 << 50)
                 && c.max_players >= c.min_players
                 && c.min_players > 0
                 && c.max_players <= 50
@@ -312,7 +495,9 @@ impl Tournament {
         check(
             &e,
             c.execution
-                >= c.reward * (3 + c.max_players as i128 + c.max_players.div_ceil(5) as i128)
+                >= c.reward
+                    * (4 + c.max_players as i128 * c.assets.len() as i128
+                        + c.max_players.div_ceil(5) as i128)
                 && c.assets.len() <= 10
                 && c.assets.contains(&c.cash)
                 && c.adapters.len() <= 5,
@@ -331,6 +516,42 @@ impl Tournament {
                 && now(&e) < d.funding_close,
             Error::InvalidConfig,
         );
+        if let Some(exit) = c.exit.terms() {
+            check(
+                &e,
+                exit.provider != e.current_contract_address()
+                    && exit.fallback_bps > 0
+                    && exit.fallback_bps <= 10000
+                    && exit.premium_bps <= 1000
+                    && exit.minimum_coverage
+                        >= ratio(
+                            &e,
+                            c.capital * c.max_players as i128,
+                            exit.fallback_bps as i128,
+                            10000,
+                        ),
+                Error::InvalidConfig,
+            );
+            let fc = FacilityConfig {
+                cash: c.cash.clone(),
+                controller: e.current_contract_address(),
+                provider: exit.provider.clone(),
+                risk_cutoff: c.calendar.risk_cutoff,
+                purchase_at: c.calendar.settle_by,
+                round_terms: e.crypto().sha256(&c.clone().to_xdr(&e)).into(),
+            };
+            let address = e
+                .deployer()
+                .with_current_contract(BytesN::from_array(&e, &[69; 32]))
+                .deploy_v2(exit.artifacts.facility_wasm.clone(), (fc,));
+            e.storage().instance().set(&Key::Facility, &address);
+        } else {
+            check(
+                &e,
+                c.adapters.is_empty() && c.assets.len() == 1,
+                Error::InvalidConfig,
+            );
+        }
         let terms: BytesN<32> = e.crypto().sha256(&c.clone().to_xdr(&e)).into();
         let mut hashes = Map::<Address, BytesN<32>>::new(&e);
         for adapter in c.adapters.iter() {
@@ -373,6 +594,43 @@ impl Tournament {
     }
     pub fn config(e: Env) -> Config {
         cfg(&e)
+    }
+    pub fn exit_facility(e: Env) -> Option<Address> {
+        e.storage().instance().get(&Key::Facility)
+    }
+    pub fn spot_receipt(e: Env, p: Address, asset: Address) -> Option<Address> {
+        e.storage().persistent().get(&Key::Receipt(p, asset))
+    }
+    pub fn residual(e: Env, vault: Address) -> Residual {
+        e.storage().persistent().get(&Key::Residual(vault)).unwrap()
+    }
+    pub fn open_orders(e: Env) -> Vec<u32> {
+        e.storage()
+            .instance()
+            .get(&Key::OpenOrders)
+            .unwrap_or(Vec::new(&e))
+    }
+    pub fn player_orders(e: Env, p: Address) -> Vec<u32> {
+        active_orders(&e, &p)
+    }
+    pub fn owner_deposits(
+        e: Env,
+        owner: Address,
+        offset: u32,
+        limit: u32,
+    ) -> Vec<(u32, Contribution)> {
+        check(&e, limit <= 20, Error::NotAllowed);
+        let ids: Vec<u32> = e
+            .storage()
+            .persistent()
+            .get(&Key::OwnerDeposits(owner))
+            .unwrap_or(Vec::new(&e));
+        let mut out = Vec::new(&e);
+        for i in offset..offset.saturating_add(limit).min(ids.len()) {
+            let id = ids.get(i).unwrap();
+            out.push_back((id, Self::contribution(e.clone(), id)));
+        }
+        out
     }
     pub fn adapter_hash(e: Env, adapter: Address) -> BytesN<32> {
         let hashes: Map<Address, BytesN<32>> =
@@ -461,6 +719,17 @@ impl Tournament {
             (t.execution, c.execution)
         };
         check(&e, n <= cap - current, Error::Funds);
+        let owner_key = Key::OwnerDeposits(owner.clone());
+        let mut deposits: Vec<u32> = e
+            .storage()
+            .persistent()
+            .get(&owner_key)
+            .unwrap_or(Vec::new(&e));
+        check(
+            &e,
+            deposits.len() < 128 && t.next_deposit < 10000,
+            Error::NotAllowed,
+        );
         token::Client::new(&e, &c.cash).transfer(&owner, &e.current_contract_address(), &n);
         if bucket == 0 {
             t.capital += n
@@ -470,6 +739,8 @@ impl Tournament {
             t.execution += n
         };
         t.next_deposit += 1;
+        deposits.push_back(t.next_deposit);
+        store(&e, &owner_key, &deposits);
         let weight: i128 = e
             .storage()
             .persistent()
@@ -564,6 +835,37 @@ impl Tournament {
         store(&e, &Key::Reg(p), &reg);
         unlock(&e);
     }
+    pub fn advance_reward(e: Env) -> i128 {
+        let c = cfg(&e);
+        let t = total(&e);
+        let p = phase(&e);
+        if p == 0 && now(&e) >= c.calendar.funding_close && activation_funded(&e, &c, &t) {
+            return c.reward;
+        }
+        if p == 2 && now(&e) >= c.calendar.start || p == 3 && now(&e) >= c.calendar.end {
+            return c.reward;
+        }
+        if p == 1 && now(&e) >= c.calendar.registration_close && now(&e) <= c.calendar.prepare_by {
+            let frozen: Option<Vec<Address>> = e.storage().instance().get(&Key::Eligible);
+            let count = if let Some(list) = frozen {
+                list.len()
+            } else {
+                let list: Vec<Address> = e.storage().instance().get(&Key::Registrations).unwrap();
+                let mut count = 0;
+                for p in list.iter() {
+                    let reg: Registration = e.storage().persistent().get(&Key::Reg(p)).unwrap();
+                    if !reg.withdrawn && reg.valid_until >= now(&e) {
+                        count += 1;
+                    }
+                }
+                count
+            };
+            if count >= c.min_players {
+                return c.reward;
+            }
+        }
+        0
+    }
     // Permissionless, deterministic registration order. Capital is assigned once at registration close.
     pub fn advance(e: Env, operator: Address) {
         operator.require_auth();
@@ -572,15 +874,13 @@ impl Tournament {
         let mut t = total(&e);
         let mut progressed = false;
         if phase(&e) == 0 && now(&e) >= c.calendar.funding_close {
-            if t.capital < c.capital * c.max_players as i128
-                || t.prizes < c.prizes
-                || t.execution < c.execution
-            {
+            if !activation_funded(&e, &c, &t) {
                 set_phase(&e, 6);
                 unlock(&e);
                 return;
             }
             set_phase(&e, 1);
+            reward(&e, &operator, &mut t);
             progressed = true;
         }
         if phase(&e) == 1 && now(&e) >= c.calendar.registration_close {
@@ -667,7 +967,7 @@ impl Tournament {
     ) -> i128 {
         p.require_auth();
         lock(&e);
-        is_trading(&e, true);
+        is_trading(&e, buy != cfg(&e).cash);
         let _ = player(&e, &p);
         let out = swap(&e, &p, &sell, &buy, n, min_out, &adapter);
         unlock(&e);
@@ -684,8 +984,8 @@ impl Tournament {
     ) -> u32 {
         p.require_auth();
         lock(&e);
-        is_trading(&e, true);
         let c = cfg(&e);
+        is_trading(&e, buy != c.cash);
         let _ = player(&e, &p);
         let mut t = total(&e);
         check(
@@ -696,18 +996,37 @@ impl Tournament {
                 && n > 0
                 && minimum > 0
                 && now(&e) < expires
-                && expires <= c.calendar.risk_cutoff,
+                && expires
+                    <= if buy == c.cash {
+                        c.calendar.end
+                    } else {
+                        c.calendar.risk_cutoff
+                    },
             Error::NotAllowed,
         );
         check(
             &e,
-            t.execution - t.fee_reserved >= c.reward * (3 + (t.players - t.settled) as i128),
+            t.execution - t.fee_reserved
+                >= c.reward * (3 + (t.players - t.settled) as i128 * c.assets.len() as i128),
             Error::Funds,
         );
+        let mut ids = active_orders(&e, &p);
+        check(&e, ids.len() < 10, Error::NotAllowed);
+        let fee = premium(&e, &sell, &buy, n);
         credit(&e, &p, &sell, -n);
+        credit(&e, &p, &c.cash, -fee);
         t.fee_reserved += c.reward;
         t.open_orders += 1;
         t.next_order += 1;
+        ids.push_back(t.next_order);
+        store(&e, &Key::PlayerOrders(p.clone()), &ids);
+        let mut all: Vec<u32> = e
+            .storage()
+            .instance()
+            .get(&Key::OpenOrders)
+            .unwrap_or(Vec::new(&e));
+        all.push_back(t.next_order);
+        e.storage().instance().set(&Key::OpenOrders, &all);
         LimitEvent {
             id: t.next_order,
             player: p.clone(),
@@ -729,6 +1048,7 @@ impl Tournament {
                 minimum,
                 expires,
                 open: true,
+                premium: fee,
             },
         );
         put_total(&e, &t);
@@ -743,6 +1063,8 @@ impl Tournament {
             o.player.require_auth();
         }
         credit(&e, &o.player, &o.sell, o.amount);
+        credit(&e, &o.player, &cfg(&e).cash, o.premium);
+        remove_order(&e, id, &o.player);
         o.open = false;
         OrderEndEvent {
             id,
@@ -760,14 +1082,16 @@ impl Tournament {
     pub fn fill_limit(e: Env, id: u32, adapter: Address, operator: Address) -> i128 {
         operator.require_auth();
         lock(&e);
-        is_trading(&e, true);
         let mut o = Self::order(e.clone(), id);
+        is_trading(&e, o.buy != cfg(&e).cash);
         check(&e, o.open && now(&e) < o.expires, Error::Consumed);
         credit(&e, &o.player, &o.sell, o.amount);
+        credit(&e, &o.player, &cfg(&e).cash, o.premium);
         let out = swap(
             &e, &o.player, &o.sell, &o.buy, o.amount, o.minimum, &adapter,
         );
         o.open = false;
+        remove_order(&e, id, &o.player);
         OrderEndEvent {
             id,
             player: o.player.clone(),
@@ -782,6 +1106,108 @@ impl Tournament {
         put_total(&e, &t);
         unlock(&e);
         out
+    }
+    pub fn expire_limits(e: Env, ids: Vec<u32>, operator: Address) {
+        operator.require_auth();
+        lock(&e);
+        check(&e, !ids.is_empty() && ids.len() <= 20, Error::NotAllowed);
+        let c = cfg(&e);
+        let mut t = total(&e);
+        for id in ids.iter() {
+            let mut o = Self::order(e.clone(), id);
+            check(
+                &e,
+                o.open && (now(&e) >= o.expires || now(&e) >= c.calendar.end),
+                Error::Window,
+            );
+            credit(&e, &o.player, &o.sell, o.amount);
+            credit(&e, &o.player, &c.cash, o.premium);
+            remove_order(&e, id, &o.player);
+            o.open = false;
+            store(&e, &Key::Order(id), &o);
+            OrderEndEvent {
+                id,
+                player: o.player,
+                filled: false,
+            }
+            .publish(&e);
+            t.fee_reserved -= c.reward;
+            t.open_orders -= 1;
+            reward(&e, &operator, &mut t);
+        }
+        put_total(&e, &t);
+        unlock(&e);
+    }
+    pub fn close_buyout(e: Env, p: Address, asset: Address, operator: Address) -> i128 {
+        operator.require_auth();
+        lock(&e);
+        let c = cfg(&e);
+        let mut t = total(&e);
+        check(
+            &e,
+            phase(&e) == 4
+                && now(&e) >= c.calendar.settle_by
+                && t.open_orders == 0
+                && !player(&e, &p).settled
+                && asset != c.cash,
+            Error::State,
+        );
+        let key = Key::Receipt(p.clone(), asset.clone());
+        let vault: Address = e.storage().persistent().get(&key).unwrap();
+        let info = ReceiptClient::new(&e, &vault).info();
+        let n = balance(&e, &p, &asset);
+        check(
+            &e,
+            info.active
+                && info.units == n
+                && n > 0
+                && info.controller == e.current_contract_address(),
+            Error::State,
+        );
+        let before = token::Client::new(&e, &c.cash).balance(&e.current_contract_address());
+        let promised = FacilityClient::new(&e, &facility(&e)).purchase(&vault);
+        let received =
+            token::Client::new(&e, &c.cash).balance(&e.current_contract_address()) - before;
+        check(&e, received == promised, Error::Funds);
+        credit(&e, &p, &asset, -n);
+        credit(&e, &p, &c.cash, received);
+        let residual = Residual {
+            owner: c.exit.terms().unwrap().clone().provider,
+            asset,
+            units: n,
+            claimed: false,
+        };
+        store(&e, &Key::Residual(vault), &residual);
+        e.storage().persistent().remove(&key);
+        reward(&e, &operator, &mut t);
+        put_total(&e, &t);
+        unlock(&e);
+        received
+    }
+    pub fn withdraw_residual(e: Env, vault: Address) -> i128 {
+        vault.require_auth();
+        lock(&e);
+        let key = Key::Residual(vault.clone());
+        let mut residual: Residual = e.storage().persistent().get(&key).unwrap();
+        check(&e, !residual.claimed, Error::Consumed);
+        check(
+            &e,
+            wasm_hash(&e, &vault) == cfg(&e).exit.terms().unwrap().artifacts.spot_receipt_wasm,
+            Error::State,
+        );
+        // The authenticated immutable receipt is the capability. Calling it back here
+        // would re-enter redeem, which Soroban correctly rejects. The payee and units
+        // were fixed atomically when that receipt was purchased.
+        residual.claimed = true;
+        store(&e, &key, &residual);
+        // Pay only the owner recorded at purchase. A frozen external asset may still reject recovery.
+        token::Client::new(&e, &residual.asset).transfer(
+            &e.current_contract_address(),
+            &residual.owner,
+            &residual.units,
+        );
+        unlock(&e);
+        residual.units
     }
     pub fn close_swap(
         e: Env,
@@ -800,6 +1226,9 @@ impl Tournament {
         );
         let n = balance(&e, &p, &sell);
         let out = swap(&e, &p, &sell, &cfg(&e).cash, n, min_out, &adapter);
+        let mut t = total(&e);
+        reward(&e, &operator, &mut t);
+        put_total(&e, &t);
         unlock(&e);
         out
     }
@@ -883,6 +1312,15 @@ impl Tournament {
     }
     pub fn refund(e: Env, id: u32) -> i128 {
         lock(&e);
+        let c = cfg(&e);
+        if phase(&e) <= 1
+            && (now(&e) > c.calendar.prepare_by
+                || (phase(&e) == 0
+                    && now(&e) >= c.calendar.funding_close
+                    && !activation_funded(&e, &c, &total(&e))))
+        {
+            set_phase(&e, 6);
+        }
         check(&e, phase(&e) == 6, Error::State);
         let mut x: Contribution = e
             .storage()

@@ -525,6 +525,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "dogstar-exit-facility"
+version = "0.3.0"
+dependencies = [
+ "dogstar-protocol-types",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "dogstar-external-interfaces"
 version = "0.2.0"
 dependencies = [
@@ -533,7 +541,7 @@ dependencies = [
 
 [[package]]
 name = "dogstar-factory"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dogstar-protocol-types",
  "soroban-sdk",
@@ -549,7 +557,7 @@ dependencies = [
 
 [[package]]
 name = "dogstar-protocol-types"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "soroban-sdk",
 ]
@@ -572,8 +580,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "dogstar-spot-receipt"
+version = "0.3.0"
+dependencies = [
+ "dogstar-protocol-types",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "dogstar-tournament"
-version = "0.1.0"
+version = "0.3.0"
 dependencies = [
  "dogstar-protocol-types",
  "soroban-sdk",

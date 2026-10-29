@@ -1,0 +1,33 @@
+{
+  "abi": "0.3.0",
+  "scope": "Local source verification; no external market certification",
+  "checks": {
+    "TypeScriptTests": 30,
+    "SorobanTests": 34,
+    "compiledWasmInterfaces": "match generated SDK",
+    "build": "TypeScript and current locked Rust workspace passed"
+  },
+  "criticalCases": [
+    "aggregate prefunded cash and rollback",
+    "provider consent to exact terms",
+    "no player auth at final buyout",
+    "native exit profit uncapped",
+    "frozen venue and frozen residual asset",
+    "failed residual redemption preserves rights",
+    "partial basis release after risk cutoff",
+    "limit premiums and paid bounded expiry",
+    "failed funding refund without keeper",
+    "persistent operator fee allocation and caps"
+  ],
+  "toolchains": {
+    "rust": "rustc 1.93.0-nightly (518b42830 2025-11-16)",
+    "node": "v24.22.1"
+  },
+  "remaining": [
+    "real isolated Blend/Zenex and fungible LP vaults",
+    "live protocol admission",
+    "common settlement valuation and asynchronous payout attribution",
+    "provider UI and production operations",
+    "independent security and economic review"
+  ]
+}
