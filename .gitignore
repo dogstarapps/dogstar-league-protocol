@@ -1,0 +1,10 @@
+node_modules/
+dist/
+contracts/target/
+contracts/**/test_snapshots/
+.local/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store

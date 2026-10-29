@@ -1,0 +1,58 @@
+{
+  "name": "@dogstar-league/protocol",
+  "version": "0.2.0",
+  "description": "Dogstar League Soroban contracts, SDK, adapters and public executor",
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/sdk/src/index.d.ts",
+      "import": "./dist/sdk/src/index.js"
+    },
+    "./sdk": {
+      "types": "./dist/sdk/src/index.d.ts",
+      "import": "./dist/sdk/src/index.js"
+    },
+    "./simulation": {
+      "types": "./dist/core/src/index.d.ts",
+      "import": "./dist/core/src/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "deployments",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "bin": {
+    "dogstar-executor": "dist/executor/src/daemon.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "executor": "tsx packages/executor/src/daemon.ts",
+    "executor:demo": "tsx packages/executor/src/cli.ts",
+    "build:contracts": "cargo build --manifest-path contracts/Cargo.toml --locked --target wasm32v1-none --release -j 2",
+    "test:contracts": "npm run build:contracts && cargo test --manifest-path contracts/Cargo.toml --locked -j 2",
+    "bindings": "node scripts/generate-bindings.mjs"
+  },
+  "dependencies": {
+    "@stellar/stellar-sdk": "17.4.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "tsx": "4.21.0",
+    "vitest": "5.0.5",
+    "@types/node": "24.19.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dogstarapps/dogstar-league-protocol.git"
+  }
+}
