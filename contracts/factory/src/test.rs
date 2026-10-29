@@ -2,7 +2,8 @@ use super::*;
 use dogstar_protocol_types::{Calendar, ExitPolicy, ExitTerms};
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
-    vec,
+    token::StellarAssetClient,
+    vec, IntoVal,
 };
 
 // The verification command builds this WASM from the current locked sources first.
@@ -193,4 +194,119 @@ fn unauthorized_creator_unapproved_policy_and_mismatched_selection_fail() {
     s.e.mock_auths(&[]);
     assert!(c.try_create(&s.c, &s.selections, &salt, &metadata).is_err());
     assert_eq!(c.count(), 0);
+}
+#[test]
+fn creator_funding_is_atomic_and_requires_consent_for_all_three_budgets() {
+    use soroban_sdk::testutils::{MockAuth, MockAuthInvoke};
+    let s = setup();
+    let factory = FactoryClient::new(&s.e, &s.factory);
+    let salt = BytesN::from_array(&s.e, &[8; 32]);
+    let metadata = BytesN::from_array(&s.e, &[9; 32]);
+    let deploy_salt: BytesN<32> =
+        s.e.crypto()
+            .sha256(&(s.c.creator.clone(), salt.clone()).to_xdr(&s.e))
+            .into();
+    let address = s.e.as_contract(&s.factory, || {
+        s.e.deployer()
+            .with_current_contract(deploy_salt)
+            .deployed_address()
+    });
+    StellarAssetClient::new(&s.e, &s.c.cash).mint(&s.c.creator, &2200);
+    let leaves = [
+        MockAuthInvoke {
+            contract: &s.c.cash,
+            fn_name: "transfer",
+            args: (s.c.creator.clone(), address.clone(), 2000i128).into_val(&s.e),
+            sub_invokes: &[],
+        },
+        MockAuthInvoke {
+            contract: &s.c.cash,
+            fn_name: "transfer",
+            args: (s.c.creator.clone(), address.clone(), 100i128).into_val(&s.e),
+            sub_invokes: &[],
+        },
+        MockAuthInvoke {
+            contract: &s.c.cash,
+            fn_name: "transfer",
+            args: (s.c.creator.clone(), address.clone(), 100i128).into_val(&s.e),
+            sub_invokes: &[],
+        },
+    ];
+    let calls = [
+        MockAuthInvoke {
+            contract: &address,
+            fn_name: "__constructor",
+            args: (s.c.clone(),).into_val(&s.e),
+            sub_invokes: &[],
+        },
+        MockAuthInvoke {
+            contract: &address,
+            fn_name: "contribute",
+            args: (s.c.creator.clone(), 0u32, 2000i128).into_val(&s.e),
+            sub_invokes: &leaves[0..1],
+        },
+        MockAuthInvoke {
+            contract: &address,
+            fn_name: "contribute",
+            args: (s.c.creator.clone(), 1u32, 100i128).into_val(&s.e),
+            sub_invokes: &leaves[1..2],
+        },
+        MockAuthInvoke {
+            contract: &address,
+            fn_name: "contribute",
+            args: (s.c.creator.clone(), 2u32, 100i128).into_val(&s.e),
+            sub_invokes: &leaves[2..3],
+        },
+    ];
+    s.e.mock_auths(&[MockAuth {
+        address: &s.c.creator,
+        invoke: &MockAuthInvoke {
+            contract: &s.factory,
+            fn_name: "create_funded",
+            args: (
+                s.c.clone(),
+                s.selections.clone(),
+                salt.clone(),
+                metadata.clone(),
+            )
+                .into_val(&s.e),
+            sub_invokes: &calls,
+        },
+    }]);
+    assert_eq!(
+        factory.create_funded(&s.c, &s.selections, &salt, &metadata),
+        address
+    );
+    assert!(factory.get(&0).creator_funded);
+    assert_eq!(
+        soroban_sdk::token::Client::new(&s.e, &s.c.cash).balance(&address),
+        2200
+    );
+    assert_eq!(
+        soroban_sdk::token::Client::new(&s.e, &s.c.cash).balance(&s.c.creator),
+        0
+    );
+    s.e.mock_all_auths();
+    assert!(FundingClient::new(&s.e, &address)
+        .try_contribute(&s.c.creator, &0, &1)
+        .is_err());
+}
+#[test]
+fn insufficient_creator_funding_rolls_back_creation_and_keeps_the_salt_reusable() {
+    let s = setup();
+    let factory = FactoryClient::new(&s.e, &s.factory);
+    let salt = BytesN::from_array(&s.e, &[8; 32]);
+    let metadata = BytesN::from_array(&s.e, &[9; 32]);
+    StellarAssetClient::new(&s.e, &s.c.cash).mint(&s.c.creator, &2199);
+    assert!(factory
+        .try_create_funded(&s.c, &s.selections, &salt, &metadata)
+        .is_err());
+    assert_eq!(factory.count(), 0);
+    assert_eq!(
+        soroban_sdk::token::Client::new(&s.e, &s.c.cash).balance(&s.c.creator),
+        2199
+    );
+    StellarAssetClient::new(&s.e, &s.c.cash).mint(&s.c.creator, &1);
+    factory.create_funded(&s.c, &s.selections, &salt, &metadata);
+    assert_eq!(factory.count(), 1);
 }

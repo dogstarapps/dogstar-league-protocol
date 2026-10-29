@@ -17,6 +17,10 @@ pub trait Registry {
 pub trait Capabilities {
     fn capabilities(e: Env) -> u32;
 }
+#[contractclient(name = "FundingClient")]
+pub trait Funding {
+    fn contribute(e: Env, owner: Address, bucket: u32, n: i128) -> u32;
+}
 #[contracttype]
 #[derive(Clone)]
 enum Key {
@@ -124,6 +128,7 @@ impl Factory {
             .deploy_v2(wasm, (c.clone(),));
         let id: u32 = e.storage().instance().get(&Key::Count).unwrap();
         let record = RoundRecord {
+            creator_funded: false,
             id,
             address: address.clone(),
             creator: c.creator.clone(),
@@ -151,6 +156,38 @@ impl Factory {
             metadata_hash,
         }
         .publish(&e);
+        address
+    }
+    pub fn create_funded(
+        e: Env,
+        c: Config,
+        selections: Vec<ProtocolSelection>,
+        salt: BytesN<32>,
+        metadata_hash: BytesN<32>,
+    ) -> Address {
+        assert!(
+            c.calendar.funding_open <= e.ledger().timestamp(),
+            "funding_not_open"
+        );
+        let address = Self::create(e.clone(), c.clone(), selections, salt, metadata_hash);
+        let client = FundingClient::new(&e, &address);
+        for (bucket, amount) in [
+            (0u32, c.capital.checked_mul(c.max_players as i128).unwrap()),
+            (1u32, c.prizes),
+            (2u32, c.execution),
+        ] {
+            if amount > 0 {
+                client.contribute(&c.creator, &bucket, &amount);
+            }
+        }
+        let id: u32 = e
+            .storage()
+            .persistent()
+            .get(&Key::ByAddress(address.clone()))
+            .unwrap();
+        let mut record = Self::get(e.clone(), id);
+        record.creator_funded = true;
+        e.storage().persistent().set(&Key::Round(id), &record);
         address
     }
     pub fn get(e: Env, id: u32) -> RoundRecord {

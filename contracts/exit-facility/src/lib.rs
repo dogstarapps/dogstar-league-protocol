@@ -207,6 +207,10 @@ impl ExitFacility {
         );
         // This calls only the immutable receipt's local ownership method, never the external venue.
         ReceiptClient::new(&e, &vault).handover(&c.provider);
+        assert!(
+            ReceiptClient::new(&e, &vault).controller() == c.provider,
+            "handover_not_completed"
+        );
         r.status = 2;
         save(&e, &vault, &r);
         e.storage()

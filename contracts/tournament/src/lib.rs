@@ -20,6 +20,8 @@ pub struct ManagedPosition {
     pub vault_hash: BytesN<32>,
     pub basis: i128,
     pub open: bool,
+    pub owner: Address,
+    pub owner_offset: u32,
 }
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -111,6 +113,8 @@ enum Key {
     NextPosition,
     Position(u32),
     PlayerPositions(Address),
+    OwnerPositionCount(Address),
+    OwnerPositionPage(Address, u32),
 }
 #[contracterror]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -213,6 +217,25 @@ pub struct RewardPaid {
     #[topic]
     pub operator: Address,
     pub amount: i128,
+}
+#[contractevent(topics=["position_opened"])]
+#[derive(Clone)]
+pub struct PositionOpened {
+    #[topic]
+    pub id: u32,
+    pub player: Address,
+    pub adapter: Address,
+    pub vault: Address,
+    pub basis: i128,
+}
+#[contractevent(topics=["position_closed"])]
+#[derive(Clone)]
+pub struct PositionClosed {
+    #[topic]
+    pub id: u32,
+    pub player: Address,
+    pub recovered: i128,
+    pub purchased: bool,
 }
 #[contract]
 pub struct Tournament;
@@ -453,8 +476,22 @@ fn position_ids(e: &Env, p: &Address) -> Vec<u32> {
         .get(&Key::PlayerPositions(p.clone()))
         .unwrap_or(Vec::new(e))
 }
-fn finish_position(e: &Env, mut position: ManagedPosition) {
+fn finish_position(e: &Env, mut position: ManagedPosition, owner: Address) {
     position.open = false;
+    let count_key = Key::OwnerPositionCount(owner.clone());
+    let count: u32 = e.storage().persistent().get(&count_key).unwrap_or(0);
+    let page_key = Key::OwnerPositionPage(owner.clone(), count / 20);
+    let mut page: Vec<u32> = e
+        .storage()
+        .persistent()
+        .get(&page_key)
+        .unwrap_or(Vec::new(e));
+    check(e, page.len() < 20, Error::State);
+    page.push_back(position.id);
+    store(e, &page_key, &page);
+    store(e, &count_key, &count.checked_add(1).unwrap());
+    position.owner = owner;
+    position.owner_offset = count;
     let mut ids = position_ids(e, &position.player);
     ids.remove(ids.first_index_of(position.id).unwrap());
     store(e, &Key::PlayerPositions(position.player.clone()), &ids);
@@ -491,16 +528,26 @@ fn native_position_exit(
     let before = cash.balance(&me);
     let returned = ManagedVaultClient::new(e, &position.vault).native_exit(&min_cash, &request);
     let received = cash.balance(&me) - before;
+    let info = ManagedVaultClient::new(e, &position.vault).info();
     check(
         e,
         received >= min_cash
             && returned == received
-            && !ManagedVaultClient::new(e, &position.vault).info().active,
+            && !info.active
+            && info.controller == position.player,
         Error::Funds,
     );
     FacilityClient::new(e, &facility(e)).release(&position.vault);
     credit(e, &position.player, &c.cash, received);
-    finish_position(e, position);
+    PositionClosed {
+        id: position.id,
+        player: position.player.clone(),
+        recovered: received,
+        purchased: false,
+    }
+    .publish(e);
+    let owner = position.player.clone();
+    finish_position(e, position, owner);
     received
 }
 fn remove_order(e: &Env, id: u32, p: &Address) {
@@ -705,6 +752,46 @@ impl Tournament {
     pub fn position(e: Env, id: u32) -> ManagedPosition {
         e.storage().persistent().get(&Key::Position(id)).unwrap()
     }
+    pub fn position_count(e: Env) -> u32 {
+        e.storage().instance().get(&Key::NextPosition).unwrap_or(0)
+    }
+    pub fn owner_position_count(e: Env, owner: Address) -> u32 {
+        e.storage()
+            .persistent()
+            .get(&Key::OwnerPositionCount(owner))
+            .unwrap_or(0)
+    }
+    pub fn owner_positions_page(
+        e: Env,
+        owner: Address,
+        offset: u32,
+        limit: u32,
+    ) -> Vec<ManagedPosition> {
+        check(&e, limit <= 20, Error::NotAllowed);
+        let mut out = Vec::new(&e);
+        let count = Self::owner_position_count(e.clone(), owner.clone());
+        for i in offset..offset.saturating_add(limit).min(count) {
+            let page: Vec<u32> = e
+                .storage()
+                .persistent()
+                .get(&Key::OwnerPositionPage(owner.clone(), i / 20))
+                .unwrap();
+            out.push_back(Self::position(e.clone(), page.get(i % 20).unwrap()));
+        }
+        out
+    }
+    pub fn positions_page(e: Env, offset: u32, limit: u32) -> Vec<ManagedPosition> {
+        check(&e, limit <= 20, Error::NotAllowed);
+        let mut out = Vec::new(&e);
+        for i in offset
+            ..offset
+                .saturating_add(limit)
+                .min(Self::position_count(e.clone()))
+        {
+            out.push_back(Self::position(e.clone(), i + 1));
+        }
+        out
+    }
     pub fn positions(e: Env, p: Address) -> Vec<ManagedPosition> {
         let mut out = Vec::new(&e);
         for id in position_ids(&e, &p).iter() {
@@ -805,6 +892,14 @@ impl Tournament {
             pay(&e, &exit.provider, fee);
         }
         t.fee_reserved += c.reward;
+        PositionOpened {
+            id,
+            player: p.clone(),
+            adapter: adapter.clone(),
+            vault: vault.clone(),
+            basis: n,
+        }
+        .publish(&e);
         ids.push_back(id);
         store(&e, &Key::PlayerPositions(p.clone()), &ids);
         store(
@@ -818,6 +913,8 @@ impl Tournament {
                 vault_hash,
                 basis: n,
                 open: true,
+                owner: e.current_contract_address(),
+                owner_offset: 0,
             },
         );
         e.storage().instance().set(&Key::NextPosition, &id);
@@ -885,7 +982,14 @@ impl Tournament {
         let received = cash.balance(&e.current_contract_address()) - before;
         check(&e, received == promised, Error::Funds);
         credit(&e, &position.player, &c.cash, received);
-        finish_position(&e, position);
+        PositionClosed {
+            id,
+            player: position.player.clone(),
+            recovered: received,
+            purchased: true,
+        }
+        .publish(&e);
+        finish_position(&e, position, c.exit.terms().unwrap().provider.clone());
         t.fee_reserved -= c.reward;
         reward(&e, &operator, &mut t);
         put_total(&e, &t);
@@ -1752,6 +1856,16 @@ impl Tournament {
         );
         ManagedVaultClient::new(&e, &position.vault).keepalive();
         FacilityClient::new(&e, &facility(&e)).keepalive(&Some(position.vault));
+        if !position.open {
+            for key in [
+                Key::OwnerPositionCount(position.owner.clone()),
+                Key::OwnerPositionPage(position.owner, position.owner_offset / 20),
+            ] {
+                e.storage()
+                    .persistent()
+                    .extend_ttl(&key, target / 2, target);
+            }
+        }
         touch(&e);
     }
     pub fn keep_order(e: Env, id: u32) {

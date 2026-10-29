@@ -34,7 +34,13 @@ impl Vault {
     pub fn handover(e: Env, to: Address) {
         let f: Address = e.storage().instance().get(&1u32).unwrap();
         f.require_auth();
+        if e.storage().instance().get(&2u32).unwrap_or(false) {
+            return;
+        }
         e.storage().instance().set(&0u32, &to);
+    }
+    pub fn ignore_handover(e: Env) {
+        e.storage().instance().set(&2u32, &true);
     }
     pub fn native_exit() {
         panic!("external_venue_frozen")
@@ -97,6 +103,22 @@ fn frozen_native_exit_does_not_block_cash_purchase_and_residual_handover() {
     );
     assert_eq!(f.reserved(), 0);
     assert!(c.try_buy(&s.facility, &s.vault).is_err());
+}
+#[test]
+fn failed_ownership_handover_cannot_spend_reserved_provider_cash() {
+    let s = setup();
+    let f = ExitFacilityClient::new(&s.e, &s.facility);
+    let c = ControllerClient::new(&s.e, &s.controller);
+    let v = VaultClient::new(&s.e, &s.vault);
+    c.reserve(&s.facility, &s.vault, &100);
+    v.ignore_handover();
+    s.e.ledger().with_mut(|l| l.timestamp = 100);
+    assert!(c.try_buy(&s.facility, &s.vault).is_err());
+    assert_eq!(v.controller(), s.controller);
+    assert_eq!(f.reserved(), 100);
+    assert_eq!(f.committed(), 1000);
+    assert_eq!(token::Client::new(&s.e, &s.cash).balance(&s.controller), 0);
+    assert_eq!(token::Client::new(&s.e, &s.cash).balance(&s.facility), 1000);
 }
 #[test]
 fn obligations_cannot_double_spend_cash_or_be_called_outside_the_round() {

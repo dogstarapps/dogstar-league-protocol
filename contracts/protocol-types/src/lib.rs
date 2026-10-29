@@ -108,6 +108,7 @@ pub struct ProtocolSelection {
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RoundRecord {
+    pub creator_funded: bool,
     pub id: u32,
     pub address: Address,
     pub creator: Address,

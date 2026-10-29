@@ -17,7 +17,7 @@ npm run build
 npm run test:contracts
 ```
 
-Contract deployment tests use the current compiled WASM. Generate current ABI 0.4.0 bindings after contract changes; retained 0.2.0/0.3.0 schemas support already-deployed immutable rounds. Deployment manifests pin actual network addresses, code hashes and interface hashes. The SDK rejects incompatible interfaces, another network and changed deployed code. Compiler versions can affect WASM hashes; bind a deployment to its own build artifacts rather than assuming every compiler produces the same binary.
+Contract deployment tests use the current compiled WASM. Generate current ABI 0.5.0 bindings after contract changes; retained 0.2.0/0.3.0/0.4.0 schemas support already-deployed immutable rounds. Deployment manifests pin actual network addresses, code hashes and interface hashes. The SDK rejects incompatible interfaces, another network and changed deployed code. Compiler versions can affect WASM hashes; bind a deployment to its own build artifacts rather than assuming every compiler produces the same binary.
 
 ## Components
 

@@ -1,8 +1,8 @@
 import { readFile } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { Spec } from "@stellar/stellar-sdk/contract";
-import { V4_BUILD_ARTIFACTS } from "../packages/sdk/src/generated/specs-v4.ts";
-for (const [name, artifact] of Object.entries(V4_BUILD_ARTIFACTS)) {
+import { V5_BUILD_ARTIFACTS } from "../packages/sdk/src/generated/specs-v5.ts";
+for (const [name, artifact] of Object.entries(V5_BUILD_ARTIFACTS)) {
   const wasm = await readFile(
     `contracts/target/wasm32v1-none/release/dogstar_${name}.wasm`,
   );

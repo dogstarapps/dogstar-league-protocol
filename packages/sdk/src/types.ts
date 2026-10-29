@@ -100,6 +100,7 @@ export interface ProtocolVersion extends ProtocolSelection {
   metadata_hash: Uint8Array;
 }
 export interface RoundRecord {
+  creator_funded?: boolean;
   id: number;
   address: ContractId;
   creator: string;
@@ -154,7 +155,7 @@ export interface RoundSnapshot {
   registrations: string[];
 }
 export interface Deployment {
-  protocolVersion?: "0.2.0" | "0.3.0" | "0.4.0";
+  protocolVersion?: "0.2.0" | "0.3.0" | "0.4.0" | "0.5.0";
   schemaVersion: 1;
   network: "TESTNET";
   rpcUrl: string;
@@ -198,6 +199,8 @@ export interface ManagedPosition {
   vault_hash: Uint8Array;
   basis: bigint;
   open: boolean;
+  owner?: string;
+  owner_offset?: number;
 }
 export interface VaultContext {
   round: string;

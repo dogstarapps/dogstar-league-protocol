@@ -6,19 +6,23 @@ import { Spec } from "@stellar/stellar-sdk/contract";
 import {
   LeagueClient,
   TestnetClient,
-  V4_BUILD_ARTIFACTS,
+  V5_BUILD_ARTIFACTS,
   stringify,
 } from "../dist/sdk/src/index.js";
 import { Journal } from "../dist/executor/src/journal.js";
 
 const manifest = JSON.parse(
-  await readFile("deployments/testnet-v4.json", "utf8"),
+  await readFile(
+    process.env.DL_TESTNET_MANIFEST ?? "deployments/testnet-v5.json",
+    "utf8",
+  ),
 );
-if (manifest.protocolVersion !== "0.4.0" || manifest.network !== "TESTNET")
+if (manifest.protocolVersion !== "0.5.0" || manifest.network !== "TESTNET")
   throw new Error(
     "Blend admission requires the managed-position Testnet deployment.",
   );
-const output = "deployments/testnet-v4-blend.json";
+const output =
+  process.env.DL_ADMISSION_OUTPUT ?? "deployments/testnet-v5-blend.json";
 try {
   await readFile(output);
   throw new Error(
@@ -117,15 +121,90 @@ for (const [name, path] of [
   if (
     createHash("sha256")
       .update(await readFile(path))
-      .digest("hex") !== V4_BUILD_ARTIFACTS[name].wasmHash
+      .digest("hex") !== V5_BUILD_ARTIFACTS[name].wasmHash
   )
     throw new Error(`Current source artifacts differ from SDK: ${name}`);
+// Reuse an already admitted immutable adapter only after checking its deployed code,
+// exact settings and registry record against the current local artifacts.
+const records = [];
+const count = await client.registry().read("count");
+for (let offset = 0; offset < count; offset += 50)
+  records.push(
+    ...(await client.registry().read("page", { offset, limit: 50 })),
+  );
+for (const existing of records
+  .filter((r) => r.id === "blend_supply")
+  .reverse()) {
+  if (
+    Buffer.from(existing.wasm_hash).toString("hex") !==
+      V5_BUILD_ARTIFACTS.blend_adapter.wasmHash ||
+    existing.capabilities !== 20
+  )
+    continue;
+  const { BoundContract } = await import("../dist/sdk/src/index.js");
+  const adapter = new BoundContract(
+    "blend_adapter",
+    existing.adapter,
+    key.publicKey(),
+    manifest.rpcUrl,
+    V5_BUILD_ARTIFACTS.blend_adapter.wasmHash,
+  );
+  const settings = await adapter.read("config");
+  if (
+    settings.cash !== manifest.cash.address ||
+    settings.underlying !== manifest.cash.address ||
+    settings.pool !== official.ids.TestnetV2 ||
+    settings.reserve_index !== reserve.config.index ||
+    Buffer.from(settings.pool_hash).toString("hex") !== poolHash ||
+    Buffer.from(settings.vault_wasm).toString("hex") !==
+      V5_BUILD_ARTIFACTS.blend_vault.wasmHash
+  )
+    continue;
+  if (
+    !(await client
+      .registry()
+      .read("available", { id: existing.id, version: existing.version }))
+  )
+    continue;
+  await writeFile(
+    output,
+    JSON.stringify(
+      {
+        ...manifest,
+        protocols: [
+          ...manifest.protocols,
+          {
+            id: existing.id,
+            version: existing.version,
+            name: "Blend supply",
+            capabilities: existing.capabilities,
+            adapter: existing.adapter,
+            wasmHash: V5_BUILD_ARTIFACTS.blend_adapter.wasmHash,
+            assets: [{ ...manifest.cash }],
+          },
+        ],
+      },
+      null,
+      2,
+    ) + "\n",
+    { flag: "wx" },
+  );
+  console.log(
+    JSON.stringify({
+      manifest: output,
+      adapter: existing.adapter,
+      reusedVerifiedAdmission: true,
+      ledger: (await client.ledger()).sequence,
+    }),
+  );
+  process.exit(0);
+}
 const uploaded = await cli(
   ["contract", "upload", "--wasm", vaultPath, "--optimize=false"],
   true,
 );
 const vaultHash = uploaded.match(/\b[a-f0-9]{64}\b/)?.[0];
-if (vaultHash !== V4_BUILD_ARTIFACTS.blend_vault.wasmHash)
+if (vaultHash !== V5_BUILD_ARTIFACTS.blend_vault.wasmHash)
   throw new Error("Unexpected vault upload hash.");
 const settings = {
   cash: manifest.cash.address,
@@ -183,7 +262,7 @@ const descriptor = {
   underlying: manifest.cash.address,
   reserveIndex: settings.reserve_index,
   adapter: address,
-  adapterHash: V4_BUILD_ARTIFACTS.blend_adapter.wasmHash,
+  adapterHash: V5_BUILD_ARTIFACTS.blend_adapter.wasmHash,
   vaultHash,
   source,
   officialPoolUsesTestOracle: poolConfig.oracle === official.ids.oraclemock,
@@ -193,7 +272,11 @@ await writeFile(`${run}/descriptor.json`, stringify(descriptor) + "\n", {
 });
 const record = {
   id: "blend_supply",
-  version: 1,
+  version:
+    Math.max(
+      0,
+      ...records.filter((r) => r.id === "blend_supply").map((r) => r.version),
+    ) + 1,
   adapter: address,
   capabilities: 20,
   wasm_hash: Buffer.from(descriptor.adapterHash, "hex"),
@@ -257,7 +340,7 @@ try {
     flag: "wx",
   });
   await writeFile(
-    "docs/evidence/blend-testnet-admission-2026-10-29.json",
+    `${run}/admission-proof.json`,
     stringify({
       checkedAt: new Date().toISOString(),
       ...descriptor,

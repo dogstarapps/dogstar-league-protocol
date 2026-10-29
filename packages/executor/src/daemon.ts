@@ -97,9 +97,9 @@ export class Executor {
     try {
       let reward = snapshot.config.reward;
       if (task.method === "advance")
-        reward = (["0.3.0", "0.4.0"] as (string | undefined)[]).includes(
-          this.client.deployment.protocolVersion,
-        )
+        reward = (
+          ["0.3.0", "0.4.0", "0.5.0"] as (string | undefined)[]
+        ).includes(this.client.deployment.protocolVersion)
           ? await c.read<bigint>("advance_reward")
           : snapshot.phase === 2 || snapshot.phase === 3
             ? snapshot.config.reward
@@ -137,7 +137,7 @@ export class Executor {
     if (transition) return transition;
     const c = this.client.round(s.address);
     if (s.phase !== 3 && s.phase !== 4) return;
-    const v3 = (["0.3.0", "0.4.0"] as (string | undefined)[]).includes(
+    const v3 = (["0.3.0", "0.4.0", "0.5.0"] as (string | undefined)[]).includes(
       this.client.deployment.protocolVersion,
     );
     const active = v3 ? await c.read<number[]>("open_orders") : undefined;
@@ -203,7 +203,11 @@ export class Executor {
       const player = await c.read<Player>("player", { p });
       if (player.settled) continue;
       let blocked = false;
-      if (this.client.deployment.protocolVersion === "0.4.0") {
+      if (
+        ["0.4.0", "0.5.0"].includes(
+          this.client.deployment.protocolVersion ?? "",
+        )
+      ) {
         for (const position of await c.read<ManagedPosition[]>("positions", {
           p,
         })) {

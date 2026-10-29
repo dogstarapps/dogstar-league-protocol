@@ -3,6 +3,7 @@ import { Spec } from "@stellar/stellar-sdk/contract";
 import { SPEC_ENTRIES, BUILD_ARTIFACTS } from "./generated/specs.js";
 import { V3_SPEC_ENTRIES, V3_BUILD_ARTIFACTS } from "./generated/specs-v3.js";
 import { V4_SPEC_ENTRIES, V4_BUILD_ARTIFACTS } from "./generated/specs-v4.js";
+import { V5_SPEC_ENTRIES, V5_BUILD_ARTIFACTS } from "./generated/specs-v5.js";
 import {
   TestnetClient,
   type WalletSigner,
@@ -29,7 +30,11 @@ const CONTRACT_SCHEMAS = {
   blend_vault: V4_SPEC_ENTRIES.blend_vault,
   lp_adapter: V4_SPEC_ENTRIES.lp_adapter,
   lp_vault: V4_SPEC_ENTRIES.lp_vault,
-  direct_swap: V4_SPEC_ENTRIES.direct_swap,
+  direct_swap: V5_SPEC_ENTRIES.direct_swap,
+  tournament_v5: V5_SPEC_ENTRIES.tournament,
+  factory_v5: V5_SPEC_ENTRIES.factory,
+  registry_v5: V5_SPEC_ENTRIES.registry,
+  managed_vault: V5_SPEC_ENTRIES.lp_vault,
 };
 export type ContractKind = keyof typeof CONTRACT_SCHEMAS;
 export class BoundContract {
@@ -99,7 +104,8 @@ export function validateDeployment(input: Deployment): Deployment {
     input.protocolVersion &&
     input.protocolVersion !== "0.2.0" &&
     input.protocolVersion !== "0.3.0" &&
-    input.protocolVersion !== "0.4.0"
+    input.protocolVersion !== "0.4.0" &&
+    input.protocolVersion !== "0.5.0"
   )
     throw new Error("Unsupported protocol version.");
   const url = new URL(input.rpcUrl);
@@ -118,11 +124,13 @@ export function validateDeployment(input: Deployment): Deployment {
   )
     throw new Error("Invalid public RPC configuration.");
   for (const [kind, artifact] of Object.entries(
-    input.protocolVersion === "0.4.0"
-      ? V4_BUILD_ARTIFACTS
-      : input.protocolVersion === "0.3.0"
-        ? V3_BUILD_ARTIFACTS
-        : BUILD_ARTIFACTS,
+    input.protocolVersion === "0.5.0"
+      ? V5_BUILD_ARTIFACTS
+      : input.protocolVersion === "0.4.0"
+        ? V4_BUILD_ARTIFACTS
+        : input.protocolVersion === "0.3.0"
+          ? V3_BUILD_ARTIFACTS
+          : BUILD_ARTIFACTS,
   )) {
     if (kind !== "factory" && kind !== "registry" && kind !== "tournament")
       continue;
@@ -146,11 +154,13 @@ export class LeagueClient {
   factory() {
     const d = this.deployment;
     return new BoundContract(
-      d.protocolVersion === "0.4.0"
-        ? "factory_v4"
-        : d.protocolVersion === "0.3.0"
-          ? "factory_v3"
-          : "factory",
+      d.protocolVersion === "0.5.0"
+        ? "factory_v5"
+        : d.protocolVersion === "0.4.0"
+          ? "factory_v4"
+          : d.protocolVersion === "0.3.0"
+            ? "factory_v3"
+            : "factory",
       d.factory.address,
       this.source,
       d.rpcUrl,
@@ -160,11 +170,13 @@ export class LeagueClient {
   registry() {
     const d = this.deployment;
     return new BoundContract(
-      d.protocolVersion === "0.4.0"
-        ? "registry_v4"
-        : d.protocolVersion === "0.3.0"
-          ? "registry_v3"
-          : "registry",
+      d.protocolVersion === "0.5.0"
+        ? "registry_v5"
+        : d.protocolVersion === "0.4.0"
+          ? "registry_v4"
+          : d.protocolVersion === "0.3.0"
+            ? "registry_v3"
+            : "registry",
       d.registry.address,
       this.source,
       d.rpcUrl,
@@ -174,11 +186,13 @@ export class LeagueClient {
   round(address: string) {
     const d = this.deployment;
     return new BoundContract(
-      d.protocolVersion === "0.4.0"
-        ? "tournament_v4"
-        : d.protocolVersion === "0.3.0"
-          ? "tournament_v3"
-          : "tournament",
+      d.protocolVersion === "0.5.0"
+        ? "tournament_v5"
+        : d.protocolVersion === "0.4.0"
+          ? "tournament_v4"
+          : d.protocolVersion === "0.3.0"
+            ? "tournament_v3"
+            : "tournament",
       address,
       this.source,
       d.rpcUrl,
@@ -197,6 +211,15 @@ export class LeagueClient {
   receipt(address: string, wasmHash: string) {
     return new BoundContract(
       "spot_receipt",
+      address,
+      this.source,
+      this.deployment.rpcUrl,
+      wasmHash,
+    );
+  }
+  vault(address: string, wasmHash: string) {
+    return new BoundContract(
+      "managed_vault",
       address,
       this.source,
       this.deployment.rpcUrl,
@@ -245,4 +268,9 @@ export const hex = (bytes: Uint8Array) =>
   Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
 export const contractKey = (address: string) =>
   new Contract(address).getFootprint();
-export { BUILD_ARTIFACTS, V3_BUILD_ARTIFACTS, V4_BUILD_ARTIFACTS };
+export {
+  BUILD_ARTIFACTS,
+  V3_BUILD_ARTIFACTS,
+  V4_BUILD_ARTIFACTS,
+  V5_BUILD_ARTIFACTS,
+};

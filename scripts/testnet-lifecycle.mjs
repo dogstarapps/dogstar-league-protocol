@@ -21,8 +21,14 @@ const blend =
   scenario === "blend"
     ? d.protocols.find((p) => p.id === "blend_supply")
     : undefined;
-if (scenario === "blend" && (!blend || d.protocolVersion !== "0.4.0"))
-  throw new Error("Use the admitted ABI 0.4.0 Blend Testnet manifest.");
+if (
+  scenario === "blend" &&
+  (!blend || !["0.4.0", "0.5.0"].includes(d.protocolVersion))
+)
+  throw new Error("Use an admitted managed-position Blend Testnet manifest.");
+const creatorFunded = process.env.DL_TESTNET_FUNDING === "creator";
+if (creatorFunded && d.protocolVersion !== "0.5.0")
+  throw new Error("Creator funding requires ABI 0.5.0.");
 const runId = crypto.randomUUID(),
   runDir = `.local/lifecycles/${runId}`;
 await mkdir(runDir, { recursive: true, mode: 0o700 });
@@ -103,7 +109,9 @@ const now = (await client.ledger()).timestamp;
 const metadata = {
   schemaVersion: 1,
   name: blend
-    ? "Blend supply lifecycle verification"
+    ? creatorFunded
+      ? "Creator-funded Blend Open"
+      : "Blend supply lifecycle verification"
     : "Protocol lifecycle verification",
   description:
     "On-chain Testnet funding, consent, public execution and claims verification.",
@@ -135,7 +143,7 @@ const config = {
   reward: 10000n,
   calendar,
 };
-if (["0.3.0", "0.4.0"].includes(d.protocolVersion))
+if (["0.3.0", "0.4.0", "0.5.0"].includes(d.protocolVersion))
   config.exit = { tag: "CashOnly" };
 if (blend)
   config.exit = {
@@ -163,31 +171,50 @@ proof.salt = salt;
 await writeFile(`${runDir}/progress.json`, stringify(proof) + "\n", {
   mode: 0o600,
 });
-const address = await invoke(client.factory(), "create", {
-  c: config,
-  selections: blend ? [{ id: blend.id, version: blend.version }] : [],
-  salt,
-  metadata_hash: await metadataHash(metadata),
-});
+const address = await invoke(
+  client.factory(),
+  creatorFunded ? "create_funded" : "create",
+  {
+    c: config,
+    selections: blend ? [{ id: blend.id, version: blend.version }] : [],
+    salt,
+    metadata_hash: await metadataHash(metadata),
+  },
+);
 proof.round = address;
 proof.metadata = metadata;
 await writeFile(`${runDir}/progress.json`, stringify(proof) + "\n", {
   mode: 0o600,
 });
 const round = client.round(address);
-const deposits = [];
-for (const [bucket, n] of [
-  [0, 20000000n],
-  [1, 10000000n],
-  [2, 10000000n],
-])
-  deposits.push(
-    await invoke(round, "contribute", {
-      owner: keys.operator.publicKey(),
-      bucket,
-      n,
-    }),
-  );
+const deposits = creatorFunded
+  ? (
+      await round.read("owner_deposits", {
+        owner: keys.operator.publicKey(),
+        offset: 0,
+        limit: 20,
+      })
+    ).map(([id]) => id)
+  : [];
+proof.creatorFunded = creatorFunded;
+if (creatorFunded) {
+  const record = await client.factory().read("find", { address });
+  if (!record.creator_funded || deposits.length !== 3)
+    throw new Error("Creator funding was not recorded atomically.");
+}
+if (!creatorFunded)
+  for (const [bucket, n] of [
+    [0, 20000000n],
+    [1, 10000000n],
+    [2, 10000000n],
+  ])
+    deposits.push(
+      await invoke(round, "contribute", {
+        owner: keys.operator.publicKey(),
+        bucket,
+        n,
+      }),
+    );
 const terms = await round.read("terms");
 const facilityAddress = blend ? await round.read("exit_facility") : undefined;
 const facility = facilityAddress
@@ -293,6 +320,21 @@ try {
       min_cash: 0n,
       request: new Uint8Array(),
     });
+    if (d.protocolVersion === "0.5.0") {
+      proof.ownedPositions = {};
+      for (const name of ["operator", "player-a", "player-b"]) {
+        const owner = keys[name].publicKey();
+        const count = await round.read("owner_position_count", { owner });
+        const positions = await round.read("owner_positions_page", {
+          owner,
+          offset: 0,
+          limit: 20,
+        });
+        if (count !== (name === "player-b" ? 0 : 1))
+          throw new Error("Incorrect final vault ownership index.");
+        proof.ownedPositions[owner] = positions;
+      }
+    }
     const available = await facility.read("available");
     if (available > 0n)
       await invoke(facility, "withdraw_free", { n: available });

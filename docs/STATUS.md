@@ -1,6 +1,6 @@
 # Implementation status
 
-Development source: 0.4.1, retaining tournament ABI 0.4.0. The public protocol remains separate from the private application/backoffice. Mainnet signing is disabled.
+Development source and tournament ABI: 0.5.0. The public protocol remains separate from the private application/backoffice. Mainnet signing is disabled.
 
 ## Verified implementation
 
@@ -46,3 +46,12 @@ Observed charged Testnet fees were 0.0416625 XLM for covered creation, 0.0887650
 The isolated Soroswap LP adapter/vault now implement the generic managed-position interface against the actual fetched router, factory and pair ABIs. Five additional tests passed for share/cash deltas, NAV growth, bad-mint rollback, donation accounting and frozen-router handover/provider share recovery, bringing the verified Rust test total to 47. The source adds LP schemas without changing the deployed tournament ABI. There is no admitted live LP route or live LP lifecycle yet. See [LP integration scope](lp-adapter.md) and [source evidence](evidence/lp-source-verification-2026-10-29.json).
 
 The direct Soroswap conversion adapter adds three strict-authorization tests for contract custody, recipient impersonation and low-output/frozen-route rollback. The current tested workspace contains 50 Rust tests; the SDK/executor has 38 TypeScript tests. The transport now accepts valid digit-bearing contract methods such as `token_0`, while rejecting invalid symbols and retaining the Testnet network gate. The LP/direct adapters are source implementations and have not been admitted to a live round.
+
+
+## Creator-funded publication and residual ownership (0.5.0)
+
+`create_funded` creates and funds capital for every seat, prizes and execution rewards in one creator-authorized transaction. The three contributions retain their normal owner-specific claims/refunds. Missing funds revert deployment, indices, transfers and salt use together. `create` retains public fundraising. The factory record exposes `creator_funded`; no platform creation fee is added. Coverage remains a separate provider commitment.
+
+The round publishes bounded historical positions and a paginated index of vaults returned to each player or acquired by the coverage provider. Owner pages contain at most 20 records; positions store their ownership-page offset so permissionless maintenance can renew the correct keys. The SDK exposes a common vault binding with code-hash verification. An exit must actually finish and restore the player as controller; a coverage purchase must actually transfer local ownership before any cash is paid.
+
+54 Rust tests and 40 TypeScript tests passed locally, including exact nested creator authorization, insufficient-balance atomic rollback/retry, a no-op ownership handover, owner-page boundaries and frozen historical ABIs. Bindings were regenerated from these WASMs and checked. Existing immutable rounds retain their own ABI 0.2/0.3/0.4 readers. New source is being verified on Testnet; this does not establish Mainnet readiness.

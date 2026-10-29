@@ -688,6 +688,39 @@ fn managed_supply_positions_account_real_cash_yield_and_reserve_closing_rewards(
     assert_eq!(c.positions(&s.p).len(), 0);
     c.settle_player(&s.p, &s.op);
     assert_eq!(c.player(&s.p).payout, 500);
+    assert_eq!(c.owner_position_count(&s.p), 1);
+    assert_eq!(
+        c.owner_positions_page(&s.p, &0, &20).get(0).unwrap().owner,
+        s.p
+    );
+    assert_eq!(c.position_count(), 1);
+    let history = c.positions_page(&0, &20);
+    assert_eq!(history.len(), 1);
+    assert!(!history.get(0).unwrap().open);
+    assert_eq!(history.get(0).unwrap().vault, c.position(&id).vault);
+    assert!(c.try_positions_page(&0, &21).is_err());
+}
+#[test]
+fn owned_position_history_crosses_page_boundaries_without_mixing_owners() {
+    let (s, _pool, adapter) = with_supply(10000);
+    let c = TournamentClient::new(&s.e, &s.id);
+    for _ in 0..21 {
+        s.e.budget().reset_default();
+        let id = c.open_position(&s.p, &adapter, &10, &vec![&s.e, 10], &Bytes::new(&s.e));
+        assert_eq!(c.exit_position(&s.p, &id, &10, &Bytes::new(&s.e)), 10);
+    }
+    s.e.budget().reset_default();
+    assert_eq!(c.owner_position_count(&s.p), 21);
+    assert_eq!(c.owner_positions_page(&s.p, &0, &20).len(), 20);
+    let page = c.owner_positions_page(&s.p, &19, &20);
+    assert_eq!(page.len(), 2);
+    assert_eq!(page.get(0).unwrap().id, 20);
+    assert_eq!(page.get(1).unwrap().id, 21);
+    assert_eq!(page.get(1).unwrap().owner_offset, 20);
+    assert_eq!(c.owner_position_count(&s.q), 0);
+    assert_eq!(c.owner_positions_page(&s.q, &0, &20).len(), 0);
+    assert_eq!(c.owner_positions_page(&s.p, &21, &20).len(), 0);
+    assert!(c.try_owner_positions_page(&s.p, &0, &21).is_err());
 }
 #[test]
 fn frozen_managed_positions_settle_via_reserved_purchase_without_player_signature() {
@@ -717,6 +750,14 @@ fn frozen_managed_positions_settle_via_reserved_purchase_without_player_signatur
     assert_eq!(c.positions(&s.p).len(), 0);
     let info = ManagedVaultClient::new(&s.e, &c.position(&id).vault).info();
     assert_eq!(info.controller, s.sponsor);
+    assert_eq!(c.owner_position_count(&s.sponsor), 1);
+    assert_eq!(
+        c.owner_positions_page(&s.sponsor, &0, &20)
+            .get(0)
+            .unwrap()
+            .vault,
+        c.position(&id).vault
+    );
     s.e.mock_all_auths();
     c.settle_player(&s.p, &s.op);
     c.settle_player(&s.q, &s.op);
