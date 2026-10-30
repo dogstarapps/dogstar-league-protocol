@@ -40,3 +40,15 @@ await writeFile(
 console.log(
   "Generated ABI schemas and hashes from current contract WASMs; retained legacy deployment schemas.",
 );
+
+// Profile ABI is independent of immutable tournament deployment ABIs.
+const profileWasm = await readFile(
+  "contracts/target/wasm32v1-none/release/dogstar_player_profile.wasm",
+);
+const profileEntries = Spec.fromWasm(profileWasm).entries.map((entry) =>
+  entry.toXDR("base64"),
+);
+await writeFile(
+  "packages/sdk/src/generated/profile-v1.ts",
+  `// Generated from the compiled player-profile contract, ABI 1.\nexport const PROFILE_SPEC_ENTRIES = ${JSON.stringify(profileEntries, null, 2)} as const;\nexport const PROFILE_BUILD_ARTIFACT = ${JSON.stringify({ wasmHash: createHash("sha256").update(profileWasm).digest("hex"), interfaceHash: createHash("sha256").update(JSON.stringify(profileEntries)).digest("hex") }, null, 2)} as const;\n`,
+);

@@ -18,3 +18,19 @@ for (const [name, artifact] of Object.entries(V5_BUILD_ARTIFACTS)) {
 console.log(
   "Current compiled interfaces match the versioned SDK. Compiler-specific code hashes are checked separately during deployment.",
 );
+
+const { PROFILE_BUILD_ARTIFACT } =
+  await import("../packages/sdk/src/generated/profile-v1.ts");
+const profile = Spec.fromWasm(
+  await readFile(
+    "contracts/target/wasm32v1-none/release/dogstar_player_profile.wasm",
+  ),
+);
+if (
+  createHash("sha256")
+    .update(
+      JSON.stringify(profile.entries.map((entry) => entry.toXDR("base64"))),
+    )
+    .digest("hex") !== PROFILE_BUILD_ARTIFACT.interfaceHash
+)
+  throw new Error("Profile ABI drift.");

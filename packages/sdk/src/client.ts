@@ -1,5 +1,6 @@
 import { Contract, Networks, StrKey } from "@stellar/stellar-sdk";
 import { Spec } from "@stellar/stellar-sdk/contract";
+import { PROFILE_SPEC_ENTRIES } from "./generated/profile-v1.js";
 import { SPEC_ENTRIES, BUILD_ARTIFACTS } from "./generated/specs.js";
 import { V3_SPEC_ENTRIES, V3_BUILD_ARTIFACTS } from "./generated/specs-v3.js";
 import { V4_SPEC_ENTRIES, V4_BUILD_ARTIFACTS } from "./generated/specs-v4.js";
@@ -17,6 +18,7 @@ import type {
 } from "./types.js";
 
 const CONTRACT_SCHEMAS = {
+  player_profile: PROFILE_SPEC_ENTRIES,
   ...SPEC_ENTRIES,
   tournament_v3: V3_SPEC_ENTRIES.tournament,
   factory_v3: V3_SPEC_ENTRIES.factory,

@@ -603,6 +603,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "dogstar-player-profile"
+version = "0.1.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
 name = "dogstar-price-policy"
 version = "0.2.0"
 dependencies = [
