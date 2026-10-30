@@ -346,6 +346,7 @@ fn malformed_or_unfillable_access_is_rejected_before_canonical_publication() {
     ] {
         let mut config = s.c.clone();
         config.access.participation = rule;
+        config.min_players = 2;
         assert!(c
             .try_create(
                 &config,
