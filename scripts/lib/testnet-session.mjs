@@ -19,7 +19,7 @@ import {
 } from "../../dist/sdk/src/index.js";
 import { Journal } from "../../dist/executor/src/journal.js";
 
-export async function testnetSession(deployment, name) {
+export async function testnetSession(deployment, name, artifacts = V5_BUILD_ARTIFACTS) {
   const keyPath = ".local/operator.secret";
   if ((await stat(keyPath)).mode & 0o077)
     throw new Error("Use a private operator key file.");
@@ -109,7 +109,7 @@ export async function testnetSession(deployment, name) {
     const wasm = await readFile(
       `contracts/target/wasm32v1-none/release/dogstar_${name}.wasm`,
     );
-    const expected = V5_BUILD_ARTIFACTS[name];
+    const expected = artifacts[name];
     if (
       !expected ||
       createHash("sha256").update(wasm).digest("hex") !== expected.wasmHash

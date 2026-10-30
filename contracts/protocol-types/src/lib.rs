@@ -30,6 +30,62 @@ pub struct Config {
     pub execution: i128,
     pub reward: i128,
     pub exit: ExitPolicy,
+    pub access: RoundAccess,
+}
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum AccessRule {
+    Open,
+    CreatorOnly,
+    Allowlist(Vec<Address>),
+}
+impl AccessRule {
+    pub fn allows(&self, wallet: &Address, creator: &Address) -> bool {
+        match self {
+            Self::Open => true,
+            Self::CreatorOnly => wallet == creator,
+            Self::Allowlist(wallets) => wallets.contains(wallet),
+        }
+    }
+    pub fn valid(&self) -> bool {
+        match self {
+            Self::Allowlist(wallets) => {
+                if wallets.is_empty() || wallets.len() > 100 {
+                    return false;
+                }
+                for i in 0..wallets.len() {
+                    for j in i + 1..wallets.len() {
+                        if wallets.get(i) == wallets.get(j) {
+                            return false;
+                        }
+                    }
+                }
+                true
+            }
+            _ => true,
+        }
+    }
+    pub fn capacity(&self) -> Option<u32> {
+        match self {
+            Self::Open => None,
+            Self::CreatorOnly => Some(1),
+            Self::Allowlist(wallets) => Some(wallets.len()),
+        }
+    }
+}
+#[contracttype]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct RoundAccess {
+    pub funding: AccessRule,
+    pub participation: AccessRule,
+}
+impl RoundAccess {
+    pub fn open() -> Self {
+        Self {
+            funding: AccessRule::Open,
+            participation: AccessRule::Open,
+        }
+    }
 }
 #[contracttype]
 #[derive(Clone, Debug, Eq, PartialEq)]

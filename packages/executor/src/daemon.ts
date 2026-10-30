@@ -130,7 +130,7 @@ export class Executor {
       if (task.maintenance) reward = 0n;
       if (task.method === "advance")
         reward = (
-          ["0.3.0", "0.4.0", "0.5.0"] as (string | undefined)[]
+          ["0.3.0", "0.4.0", "0.5.0", "0.6.0"] as (string | undefined)[]
         ).includes(this.client.deployment.protocolVersion)
           ? await c.read<bigint>("advance_reward")
           : snapshot.phase === 2 || snapshot.phase === 3
@@ -187,9 +187,9 @@ export class Executor {
     const c = this.client.round(s.address);
     if (s.phase !== 3 && s.phase !== 4) return this.maintenance(s);
     let archived: RestorationRequired | undefined;
-    const v3 = (["0.3.0", "0.4.0", "0.5.0"] as (string | undefined)[]).includes(
-      this.client.deployment.protocolVersion,
-    );
+    const v3 = (
+      ["0.3.0", "0.4.0", "0.5.0", "0.6.0"] as (string | undefined)[]
+    ).includes(this.client.deployment.protocolVersion);
     const active = v3 ? await c.read<number[]>("open_orders") : undefined;
     const total =
       active?.length ?? (s.totals.open_orders > 0 ? s.totals.next_order : 0);
@@ -258,7 +258,7 @@ export class Executor {
       if (player.settled) continue;
       let blocked = false;
       if (
-        ["0.4.0", "0.5.0"].includes(
+        ["0.4.0", "0.5.0", "0.6.0"].includes(
           this.client.deployment.protocolVersion ?? "",
         )
       ) {

@@ -17,7 +17,7 @@ npm run build
 npm run test:contracts
 ```
 
-Contract deployment tests use the current compiled WASM. Generate current ABI 0.5.0 bindings after contract changes; retained 0.2.0/0.3.0/0.4.0 schemas support already-deployed immutable rounds. Deployment manifests pin actual network addresses, code hashes and interface hashes. The SDK rejects incompatible interfaces, another network and changed deployed code. Compiler versions can affect WASM hashes; bind a deployment to its own build artifacts rather than assuming every compiler produces the same binary.
+Contract deployment tests use the current compiled WASM. Generate current ABI 0.6.0 bindings after contract changes; retained 0.2.0/0.3.0/0.4.0/0.5.0 schemas support already-deployed immutable rounds. Deployment manifests pin actual network addresses, code hashes and interface hashes. The SDK rejects incompatible interfaces, another network and changed deployed code. Compiler versions can affect WASM hashes; bind a deployment to its own build artifacts rather than assuming every compiler produces the same binary.
 
 ## Components
 
@@ -34,6 +34,8 @@ Contract deployment tests use the current compiled WASM. Generate current ABI 0.
 - `packages/sdk`: generated WASM schemas, deployment compatibility, typed snapshots, canonical metadata, wallet signing, pending outcomes and restoration preparation.
 - `packages/executor`: permissionless Testnet planning/submission with an operator-owned signer and persistent pending-envelope journal.
 - `packages/core`: browser-safe reference simulation and economic invariants; its demo state is never authoritative for live execution.
+
+Funding and player entry can be open, creator-only or restricted to immutable wallet invitations; see [round access](docs/round-access.md).
 
 Protocol IDs, addresses and capabilities come from the registry and deployment manifest. The live SDK does not use the simulation's fixed protocol catalog as admission authority.
 

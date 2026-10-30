@@ -615,6 +615,16 @@ fn swap(
 impl Tournament {
     pub fn __constructor(e: Env, c: Config) {
         c.creator.require_auth();
+        check(
+            &e,
+            c.access.funding.valid()
+                && c.access.participation.valid()
+                && c.access
+                    .participation
+                    .capacity()
+                    .is_none_or(|n| n >= c.min_players),
+            Error::InvalidConfig,
+        );
         let d = &c.calendar;
         check(
             &e,
@@ -1102,6 +1112,11 @@ impl Tournament {
         owner.require_auth();
         lock(&e);
         let c = cfg(&e);
+        check(
+            &e,
+            c.access.funding.allows(&owner, &c.creator),
+            Error::NotAllowed,
+        );
         let mut t = total(&e);
         check(
             &e,
@@ -1173,6 +1188,11 @@ impl Tournament {
         p.require_auth();
         lock(&e);
         let c = cfg(&e);
+        check(
+            &e,
+            c.access.participation.allows(&p, &c.creator),
+            Error::NotAllowed,
+        );
         check(
             &e,
             phase(&e) <= 1

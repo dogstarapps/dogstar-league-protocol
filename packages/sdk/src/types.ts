@@ -57,6 +57,16 @@ export interface RoundConfig {
   execution: bigint;
   reward: bigint;
   exit?: ExitPolicy;
+  /** Required by ABI 0.6.0; absent only in earlier immutable deployments. */
+  access?: RoundAccess;
+}
+export type AccessRule =
+  | { tag: "Open"; values?: undefined }
+  | { tag: "CreatorOnly"; values?: undefined }
+  | { tag: "Allowlist"; values: [string[]] };
+export interface RoundAccess {
+  funding: AccessRule;
+  participation: AccessRule;
 }
 export interface ExitArtifacts {
   facility_wasm: Uint8Array;
@@ -157,7 +167,7 @@ export interface RoundSnapshot {
 export interface Deployment {
   quotePolicy?: { address: ContractId; wasmHash: string };
   profile?: import("./profile.js").ProfileDeployment;
-  protocolVersion?: "0.2.0" | "0.3.0" | "0.4.0" | "0.5.0";
+  protocolVersion?: "0.2.0" | "0.3.0" | "0.4.0" | "0.5.0" | "0.6.0";
   schemaVersion: 1;
   network: "TESTNET";
   rpcUrl: string;

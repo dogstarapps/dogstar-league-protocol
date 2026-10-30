@@ -34,8 +34,8 @@ for (const name of contracts) {
 }
 await mkdir("packages/sdk/src/generated", { recursive: true });
 await writeFile(
-  "packages/sdk/src/generated/specs-v5.ts",
-  `// Generated from current compiled contract WASM. ABI 0.5.0. Prior schemas remain frozen for existing immutable deployments. Run npm run bindings after contract changes.\nexport const V5_SPEC_ENTRIES = ${JSON.stringify(schemas, null, 2)} as const;\nexport const V5_BUILD_ARTIFACTS = ${JSON.stringify(artifacts, null, 2)} as const;\n`,
+  "packages/sdk/src/generated/specs-v6.ts",
+  `// Generated from current compiled contract WASM. ABI 0.6.0. Prior schemas remain frozen for existing immutable deployments. Run npm run bindings after contract changes.\nexport const V6_SPEC_ENTRIES = ${JSON.stringify(schemas, null, 2)} as const;\nexport const V6_BUILD_ARTIFACTS = ${JSON.stringify(artifacts, null, 2)} as const;\n`,
 );
 console.log(
   "Generated ABI schemas and hashes from current contract WASMs; retained legacy deployment schemas.",

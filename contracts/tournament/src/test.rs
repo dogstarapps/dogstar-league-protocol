@@ -1,5 +1,5 @@
 use super::*;
-use dogstar_protocol_types::{ExitArtifacts, ExitPolicy, ExitTerms};
+use dogstar_protocol_types::{AccessRule, ExitArtifacts, ExitPolicy, ExitTerms, RoundAccess};
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
     token::StellarAssetClient,
@@ -54,6 +54,9 @@ fn setup() -> Setup {
     setup_with(0, 10000)
 }
 fn setup_with(premium_bps: u32, coverage: i128) -> Setup {
+    setup_access(premium_bps, coverage, 0)
+}
+fn setup_access(premium_bps: u32, coverage: i128, mode: u32) -> Setup {
     let e = Env::default();
     e.mock_all_auths();
     e.ledger().with_mut(|l| l.timestamp = 10);
@@ -106,6 +109,18 @@ fn setup_with(premium_bps: u32, coverage: i128) -> Setup {
         prizes: 100,
         execution: 100,
         reward: 1,
+        access: if mode == 0 {
+            RoundAccess::open()
+        } else {
+            RoundAccess {
+                funding: if mode == 1 {
+                    AccessRule::CreatorOnly
+                } else {
+                    AccessRule::Allowlist(vec![&e, sponsor.clone()])
+                },
+                participation: AccessRule::Allowlist(vec![&e, p.clone(), q.clone()]),
+            }
+        },
         exit: ExitPolicy::Covered(ExitTerms {
             provider: sponsor.clone(),
             fallback_bps: 10000,
@@ -807,4 +822,57 @@ fn permissionless_player_maintenance_renews_positions_vaults_and_coverage_togeth
     assert!(s.e.as_contract(&vault, || s.e.storage().instance().get_ttl()) > old);
     assert!(s.e.as_contract(&facility, || s.e.storage().instance().get_ttl()) > old);
     assert_eq!(c.positions(&s.p).len(), 1);
+}
+
+#[test]
+fn immutable_wallet_access_rejects_uninvited_contributors_and_players() {
+    for mode in [1, 2] {
+        let s = setup_access(0, 10000, mode);
+        let c = TournamentClient::new(&s.e, &s.id);
+        StellarAssetClient::new(&s.e, &s.cash).mint(&s.op, &1000);
+        let before = token::Client::new(&s.e, &s.cash).balance(&s.op);
+        for bucket in [0, 1, 2] {
+            assert_eq!(
+                c.try_contribute(&s.op, &bucket, &1),
+                Err(Ok(Error::NotAllowed))
+            );
+        }
+        assert_eq!(token::Client::new(&s.e, &s.cash).balance(&s.op), before);
+        assert_eq!(c.totals().next_deposit, 0);
+        assert_eq!(
+            c.try_pre_register(&s.op, &c.terms(), &40),
+            Err(Ok(Error::NotAllowed))
+        );
+        assert!(c.registrations().is_empty());
+        funded(&s);
+        assert_eq!(c.registrations().len(), 2);
+        c.leave(&s.p);
+        c.pre_register(&s.p, &c.terms(), &40);
+        assert_eq!(c.registrations().len(), 2);
+    }
+}
+
+#[test]
+fn access_is_part_of_consent_and_never_gates_public_closure_or_claims() {
+    let s = setup_access(0, 10000, 1);
+    let c = TournamentClient::new(&s.e, &s.id);
+    let mut other_terms = c.config();
+    other_terms.access = RoundAccess::open();
+    let wrong: BytesN<32> = s.e.crypto().sha256(&other_terms.to_xdr(&s.e)).into();
+    assert_eq!(c.try_pre_register(&s.p, &wrong, &40), Err(Ok(Error::Terms)));
+    active(&s);
+    s.e.ledger().with_mut(|l| l.timestamp = 100);
+    c.advance(&s.op);
+    c.settle_player(&s.p, &s.op);
+    c.settle_player(&s.q, &s.op);
+    c.finalize(&s.op);
+    let winner = c.totals().prize_winner.unwrap();
+    let before = token::Client::new(&s.e, &s.cash).balance(&winner);
+    s.e.set_auths(&[]);
+    c.claim(&winner);
+    assert_eq!(
+        token::Client::new(&s.e, &s.cash).balance(&winner),
+        before + 100
+    );
+    assert_eq!(c.sponsor_claim(&1), 2000);
 }

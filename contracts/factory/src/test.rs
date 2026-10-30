@@ -1,5 +1,5 @@
 use super::*;
-use dogstar_protocol_types::{Calendar, ExitPolicy, ExitTerms};
+use dogstar_protocol_types::{AccessRule, Calendar, ExitPolicy, ExitTerms, RoundAccess};
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
     token::StellarAssetClient,
@@ -114,6 +114,7 @@ fn setup() -> Setup {
         prizes: 100,
         execution: 100,
         reward: 1,
+        access: RoundAccess::open(),
         exit: ExitPolicy::Covered(ExitTerms {
             provider: creator,
             fallback_bps: 10000,
@@ -309,4 +310,77 @@ fn insufficient_creator_funding_rolls_back_creation_and_keeps_the_salt_reusable(
     StellarAssetClient::new(&s.e, &s.c.cash).mint(&s.c.creator, &1);
     factory.create_funded(&s.c, &s.selections, &salt, &metadata);
     assert_eq!(factory.count(), 1);
+}
+
+#[test]
+fn malformed_or_unfillable_access_is_rejected_before_canonical_publication() {
+    let s = setup();
+    let c = FactoryClient::new(&s.e, &s.factory);
+    let wallet = Address::generate(&s.e);
+    let mut oversized = Vec::new(&s.e);
+    for _ in 0..101 {
+        oversized.push_back(Address::generate(&s.e));
+    }
+    let invalid = vec![
+        &s.e,
+        AccessRule::Allowlist(vec![&s.e]),
+        AccessRule::Allowlist(vec![&s.e, wallet.clone(), wallet.clone()]),
+        AccessRule::Allowlist(oversized),
+    ];
+    for rule in invalid.iter() {
+        let mut config = s.c.clone();
+        config.access.funding = rule;
+        assert!(c
+            .try_create(
+                &config,
+                &s.selections,
+                &BytesN::from_array(&s.e, &[22; 32]),
+                &BytesN::from_array(&s.e, &[23; 32])
+            )
+            .is_err());
+        assert_eq!(c.count(), 0);
+    }
+    for rule in [
+        AccessRule::CreatorOnly,
+        AccessRule::Allowlist(vec![&s.e, wallet]),
+    ] {
+        let mut config = s.c.clone();
+        config.access.participation = rule;
+        assert!(c
+            .try_create(
+                &config,
+                &s.selections,
+                &BytesN::from_array(&s.e, &[22; 32]),
+                &BytesN::from_array(&s.e, &[23; 32])
+            )
+            .is_err());
+        assert_eq!(c.count(), 0);
+    }
+}
+
+#[test]
+fn atomic_creator_funding_cannot_bypass_the_immutable_contributor_allowlist() {
+    let s = setup();
+    let c = FactoryClient::new(&s.e, &s.factory);
+    let mut config = s.c.clone();
+    config.access.funding = AccessRule::Allowlist(vec![&s.e, Address::generate(&s.e)]);
+    StellarAssetClient::new(&s.e, &config.cash).mint(&config.creator, &10000);
+    let before = soroban_sdk::token::Client::new(&s.e, &config.cash).balance(&config.creator);
+    let salt = BytesN::from_array(&s.e, &[24; 32]);
+    let meta = BytesN::from_array(&s.e, &[25; 32]);
+    assert!(c
+        .try_create_funded(&config, &s.selections, &salt, &meta)
+        .is_err());
+    assert_eq!(c.count(), 0);
+    assert_eq!(
+        soroban_sdk::token::Client::new(&s.e, &config.cash).balance(&config.creator),
+        before
+    );
+    config.access.funding = AccessRule::CreatorOnly;
+    let round = c.create_funded(&config, &s.selections, &salt, &meta);
+    assert_eq!(c.count(), 1);
+    assert_eq!(
+        RoundClient::new(&s.e, &round).config().access.funding,
+        AccessRule::CreatorOnly
+    );
 }
