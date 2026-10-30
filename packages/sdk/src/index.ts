@@ -4,3 +4,4 @@ export * from "./client.js";
 export * from "./types.js";
 export * from "./metadata.js";
 export * from "./profile.js";
+export * from "./liquidity.js";

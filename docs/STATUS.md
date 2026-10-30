@@ -65,3 +65,5 @@ Observed ABI 0.5.0 Testnet fees were 0.0670836 XLM for atomic funded publication
 ## Public wallet profile registry (2026-10-30)
 
 SDK package 0.5.1 adds an independently versioned player-profile ABI while retaining tournament ABI 0.5.0. The immutable profile registry stores wallet-authorized nickname/avatar CID and revisions, supports bounded public reads and permissionless state upkeep, and has no administrator, upgrade, transfer or global score authority. Five additional authorization/concurrency/content-boundary/maintenance tests bring the workspace to 59 Rust tests; 43 SDK/executor tests pass. The actual Testnet profile sequence and charged fees are in `evidence/testnet-profiles-2026-10-30.json`. The application uses the public contract directly and verifies content-addressed raw PNG/JPEG image blocks; NFT/AI/progression services are separate.
+
+SDK 0.5.2 adds registry/code-checked LP entry quotes, exact integer mint projections, both independent valuation checks and expiring minimums. Four additional tests cover precision, conversion-before-mint accounting, paused admission, price-floor failures and stale review. Live LP admission remains outstanding.
