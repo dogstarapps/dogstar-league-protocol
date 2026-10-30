@@ -19,7 +19,11 @@ import {
 } from "../../dist/sdk/src/index.js";
 import { Journal } from "../../dist/executor/src/journal.js";
 
-export async function testnetSession(deployment, name, artifacts = V5_BUILD_ARTIFACTS) {
+export async function testnetSession(
+  deployment,
+  name,
+  artifacts = V5_BUILD_ARTIFACTS,
+) {
   const keyPath = ".local/operator.secret";
   if ((await stat(keyPath)).mode & 0o077)
     throw new Error("Use a private operator key file.");

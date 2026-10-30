@@ -834,14 +834,14 @@ fn immutable_wallet_access_rejects_uninvited_contributors_and_players() {
         for bucket in [0, 1, 2] {
             assert_eq!(
                 c.try_contribute(&s.op, &bucket, &1),
-                Err(Ok(Error::NotAllowed))
+                Err(Ok(Error::NotAllowed.into()))
             );
         }
         assert_eq!(token::Client::new(&s.e, &s.cash).balance(&s.op), before);
         assert_eq!(c.totals().next_deposit, 0);
         assert_eq!(
             c.try_pre_register(&s.op, &c.terms(), &40),
-            Err(Ok(Error::NotAllowed))
+            Err(Ok(Error::NotAllowed.into()))
         );
         assert!(c.registrations().is_empty());
         funded(&s);
@@ -859,7 +859,10 @@ fn access_is_part_of_consent_and_never_gates_public_closure_or_claims() {
     let mut other_terms = c.config();
     other_terms.access = RoundAccess::open();
     let wrong: BytesN<32> = s.e.crypto().sha256(&other_terms.to_xdr(&s.e)).into();
-    assert_eq!(c.try_pre_register(&s.p, &wrong, &40), Err(Ok(Error::Terms)));
+    assert_eq!(
+        c.try_pre_register(&s.p, &wrong, &40),
+        Err(Ok(Error::Terms.into()))
+    );
     active(&s);
     s.e.ledger().with_mut(|l| l.timestamp = 100);
     c.advance(&s.op);
