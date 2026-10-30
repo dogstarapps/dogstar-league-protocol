@@ -10,13 +10,14 @@ Use Node 24.22.1, Rust and the `wasm32v1-none` target. Check the destination dis
 npm ci --ignore-scripts
 npm run build:contracts
 npm run bindings
+npm run check:bindings
 npm run typecheck
 npm test
 npm run build
 npm run test:contracts
 ```
 
-Contract deployment tests use the current compiled WASM. Generate bindings after contract changes. Deployment manifests pin actual network addresses, code hashes and interface hashes. The SDK rejects incompatible interfaces, another network and changed deployed code. Compiler versions can affect WASM hashes; bind a deployment to its own build artifacts rather than assuming every compiler produces the same binary.
+Contract deployment tests use the current compiled WASM. Generate current ABI 0.6.0 bindings after contract changes; retained 0.2.0/0.3.0/0.4.0/0.5.0 schemas support already-deployed immutable rounds. Deployment manifests pin actual network addresses, code hashes and interface hashes. The SDK rejects incompatible interfaces, another network and changed deployed code. Compiler versions can affect WASM hashes; bind a deployment to its own build artifacts rather than assuming every compiler produces the same binary.
 
 ## Components
 
@@ -24,24 +25,33 @@ Contract deployment tests use the current compiled WASM. Generate bindings after
 - `contracts/registry`: immutable protocol versions, capabilities, code-hash admission and selection pause.
 - `contracts/factory`: round deployment and indexed configuration/metadata commitments.
 - `contracts/spot-adapter`: immutable Aquarius, Sushi and Soroswap routes through the aggregator wire interface, exact nested authorization and actual balance deltas.
+- `contracts/exit-facility`, `contracts/spot-receipt`: aggregate reserved exit cash, signed provider terms, explicit strike/premium accounting and residual ownership handover without external venue calls.
+- `contracts/blend-adapter`, `contracts/blend-vault`: isolated supply, actual b-shares, cash-delta recovery and local ownership handover. The official Blend Testnet lifecycle has completed.
+- `contracts/direct-swap`: direct Soroswap pair conversion with pinned router/factory/pair code, exact nested token pulls and actual recipient deltas.
+- `contracts/lp-adapter`, `contracts/lp-vault`: isolated Soroswap LP shares, independent entry value, bounded donation accounting and provider recovery; the official Testnet conversion, mint/burn, public purchase and provider recovery lifecycle has completed.
+- `contracts/zenex-adapter`, `contracts/zenex-vault`, `contracts/zenex-types`: experimental perpetual positions requiring venue-owned cumulative payment accounting. The inspected Zenex market lacks this getter and remains unadmitted.
 - `contracts/price-policy`: independent SEP-40 prices, fixed token/feed mappings, freshness, timestamp skew and decimal validation.
 - `packages/sdk`: generated WASM schemas, deployment compatibility, typed snapshots, canonical metadata, wallet signing, pending outcomes and restoration preparation.
 - `packages/executor`: permissionless Testnet planning/submission with an operator-owned signer and persistent pending-envelope journal.
 - `packages/core`: browser-safe reference simulation and economic invariants; its demo state is never authoritative for live execution.
+
+Funding and player entry can be open, creator-only or restricted to immutable wallet invitations; see [round access](docs/round-access.md).
 
 Protocol IDs, addresses and capabilities come from the registry and deployment manifest. The live SDK does not use the simulation's fixed protocol catalog as admission authority.
 
 ## Run an executor
 
 ```sh
-npm run executor -- --manifest=deployments/testnet.json --key-file=/private/operator.secret --journal=.local/executor.sqlite --once
+npm run executor -- --manifest=deployments/testnet.json --key-file=/private/operator.secret --journal=.local/executor.sqlite --fee-budget-stroops=100000000 --max-fee-stroops=10000000 --min-surplus-stroops=1000 --once
 ```
 
-The operator supplies their own funded Testnet account and a secret file with mode `0600`. Each operator has their own journal. No Dogstar API or exclusive operator key is required. Signed envelopes are persisted before broadcast. A pending outcome is reconciled by hash, or the exact same signed envelope is rebroadcast; the executor does not rebuild an ambiguous operation. All eligibility and rewards are checked by contracts.
+The operator supplies their own funded Testnet account and a secret file with mode `0600`. Each operator has their own journal. No Dogstar API or exclusive operator key is required. Signed envelopes are persisted before broadcast. A pending outcome is reconciled by hash, or the exact same signed envelope is rebroadcast; the executor does not rebuild an ambiguous operation. All eligibility and rewards are checked by contracts. The default signing budget is zero; fee caps and the cumulative journal allowance are denominated in native XLM stroops. The executor compares assembled fees with eligible native rewards before signing. `--allow-unprofitable` explicitly permits bounded Testnet maintenance and restoration; it does not bypass the fee cap or cumulative allowance. Failed or ambiguous spend remains allocated conservatively. Ledger races can still cost fees.
+
+Read-only planning, multiple factories, health reporting, backoff and operator setup are documented in the [executor runbook](docs/executor-operations.md). The verified LP manifest is `deployments/testnet-v5-lp.json`.
 
 ## Implementation boundary
 
-This is development software. Local external-market and oracle fixtures do not certify a live venue. Isolated Blend/Zenex ownership, prefunded final exits, live venue admission, scalability and production reviews remain tracked in [implementation status](docs/STATUS.md). Mainnet signing is disabled. A final buyout must assign enforceable residual rights against prefunded aggregate obligations; it cannot unfreeze an external protocol.
+This is development software. Local external-market and oracle fixtures do not certify a live venue. Live Zenex admission, independent end valuation, scalability and production reviews remain tracked in [implementation status](docs/STATUS.md). Mainnet signing is disabled. A final buyout must assign enforceable residual rights against prefunded aggregate obligations; it cannot unfreeze an external protocol.
 
 Player positive profit is calculated individually, separately from sponsor principal. The default share is 100%; configurable shares are immutable round terms. Arbitrary rounds have no MyLab, TERRY, POWER or HAW-AI authority.
 

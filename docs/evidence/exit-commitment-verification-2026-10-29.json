@@ -1,0 +1,17 @@
+{
+  "abi": "0.3.0",
+  "checks": {
+    "SorobanTests": 35,
+    "TypeScriptTests": 30,
+    "interfaceDrift": "passed",
+    "TypeScriptBuild": "passed"
+  },
+  "addedInvariants": [
+    "only provider-signed funding creates coverage capacity",
+    "unsolicited transfers cannot authorize provider exposure",
+    "reserved and committed cash decrease atomically on purchase",
+    "uncommitted surplus cannot displace reserved obligations",
+    "covered rounds require positive committed capacity"
+  ],
+  "testnetVerificationHelper": "Each run has a unique private folder and durable per-actor envelope journals; prior lifecycle evidence is preserved."
+}

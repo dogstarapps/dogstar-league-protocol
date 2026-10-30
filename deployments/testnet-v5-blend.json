@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": "0.5.0",
+  "exitArtifacts": {
+    "facility_wasm": "e898b92243d8076d6fa7c1a77a7457a0dbaeea29c8ef9c9d6cb4d99d305ac712",
+    "spot_receipt_wasm": "747e4f09c95a6f088760d9b772c19e92e9b8d253744691ccdc632380327bcde4"
+  },
+  "network": "TESTNET",
+  "environment": "testnet",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "readSource": "GASI5ZPQHRTDBKWZRQL63NMOOVUKL7QFRVX6ZNZGOB4YAYVDK6WRWTIQ",
+  "registry": {
+    "address": "CCCUTJPDO47AZBR63BV6O5ECBKMLZT5KOSFOFBKG7ZWKV6KMAFRIZRX7",
+    "wasmHash": "3e9814c335171529b0147250c8cd1da9ca736d225edf6f3304d269ce4a1153ba",
+    "interfaceHash": "ce7b83da6dd9c42ef16a2167b4693d7656c639e0296948c2668b1c651be3f770"
+  },
+  "factory": {
+    "address": "CDHEL5PX3V6ESGRQHZFSUO4ZCYKPBGWYINLKFOIXKPZCBYGVLUE4QDMA",
+    "wasmHash": "24e4d16f3f5da1c271f83a0bfb6eea67a3210d06b977db568f49c60c96200212",
+    "interfaceHash": "ea9919841be1a9c43112f720535a548ba58c72b345ac4d3944ed373cedfe5ec3"
+  },
+  "tournament": {
+    "wasmHash": "75e1a98e02494f71f3d8d613e919e95a26a96d24418293318eb0fb8cc74c521d",
+    "interfaceHash": "21943981ba5b228e499a8e6286a51dc3cf4f705e6bd23fc69cdb910a6a7f2aed"
+  },
+  "quotePolicy": {
+    "address": "CDLTRNW2IXU4FN5IFO2FNIJWJWK5R7NJLG55XEA37ZRNYVYFYPDAV6OG",
+    "wasmHash": "8ece8aecc51748ac4baf2e13bdc1f9eb6c9d90c28243d69a8a37322cbbc2eea8"
+  },
+  "cash": {
+    "address": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+    "symbol": "XLM",
+    "decimals": 7
+  },
+  "protocols": [
+    {
+      "id": "blend_supply",
+      "version": 1,
+      "name": "Blend supply",
+      "capabilities": 20,
+      "adapter": "CBT6K3JRAD3N6J5APHRX5PYM7TBK45TBZTH5MUPAEOAKB4OQ3643ROYS",
+      "wasmHash": "b1f4297c6ee8e8cf73d787134c5ef2bd0c1d90df4bbc83ab697f18f2666e0b65",
+      "assets": [
+        {
+          "address": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+          "symbol": "XLM",
+          "decimals": 7
+        }
+      ]
+    }
+  ],
+  "deployedAt": "2026-10-29T23:17:52.942Z"
+}

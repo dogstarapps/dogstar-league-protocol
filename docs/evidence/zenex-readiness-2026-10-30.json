@@ -1,0 +1,126 @@
+{
+  "checkedAt": "2026-10-30T08:56:07.504Z",
+  "network": "PUBLIC",
+  "market": {
+    "address": "CAOZCITWHWAXH5FRU4EULQ5EN2HMTCHICRNC4R5ZAOVD7XHCCQSJ42IB",
+    "codeHash": "02aa342f5e6e084c8e5728b74aee77864f77ea720896e61a689da8252f95943c",
+    "observedLedger": 65212956
+  },
+  "settlementToken": "CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75",
+  "oracle": {
+    "address": "CBQP3O5NW6S4ZRE4SZAUO3VDOR32OMO22FLLMP3DJMO3TXJEPNW65XXU",
+    "codeHash": "90e0f43192ac14389c7721b67b5f5a3ca92b24f0a5c677241e303084b9c38f55",
+    "observedLedger": 65212956
+  },
+  "feedId": "000358cb12b1f5bbeca8b5b4666025a40b15520af1f82516ee2fb9a335055e9a",
+  "status": 0,
+  "marketConfig": {
+    "adl_clear_target": {
+      "$bigint": "400000000000000000"
+    },
+    "adl_max_pnl": {
+      "$bigint": "550000000000000000"
+    },
+    "borrow_rate": {
+      "$bigint": "15854895992"
+    },
+    "deposit_fee": {
+      "$bigint": "1000000000000000"
+    },
+    "exec_fee": {
+      "$bigint": "100000"
+    },
+    "fee_dom": {
+      "$bigint": "600000000000000"
+    },
+    "fee_non_dom": {
+      "$bigint": "400000000000000"
+    },
+    "funding_decrease": {
+      "$bigint": "36885"
+    },
+    "funding_increase": {
+      "$bigint": "885267"
+    },
+    "funding_max": {
+      "$bigint": "6373921868"
+    },
+    "funding_min": {
+      "$bigint": "317097920"
+    },
+    "impact_scalar": {
+      "$bigint": "100000000000000"
+    },
+    "increased_borrow_rate": {
+      "$bigint": "15854895992"
+    },
+    "init_margin": {
+      "$bigint": "50000000000000000"
+    },
+    "keeper_rate": {
+      "$bigint": "100000000000000000"
+    },
+    "liq_fee": {
+      "$bigint": "5000000000000000"
+    },
+    "maintenance_margin": {
+      "$bigint": "20000000000000000"
+    },
+    "max_open_interest": {
+      "$bigint": "500000000000"
+    },
+    "max_pnl_trader": {
+      "$bigint": "900000000000000000"
+    },
+    "max_pnl_withdraw": {
+      "$bigint": "150000000000000000"
+    },
+    "max_position_notional": {
+      "$bigint": "5000000000"
+    },
+    "max_util_open": {
+      "$bigint": "800000000000000000"
+    },
+    "max_util_withdraw": {
+      "$bigint": "900000000000000000"
+    },
+    "max_vault_balance": {
+      "$bigint": "1000000000000"
+    },
+    "min_deposit": {
+      "$bigint": "100000000"
+    },
+    "min_order_margin": {
+      "$bigint": "10000000"
+    },
+    "min_order_notional": {
+      "$bigint": "10000000"
+    },
+    "min_position_notional": {
+      "$bigint": "10000000"
+    },
+    "notional_lock": {
+      "$bigint": "30"
+    },
+    "redeem_fee": {
+      "$bigint": "2500000000000000"
+    },
+    "redeem_lock": {
+      "$bigint": "3600"
+    },
+    "target_util": {
+      "$bigint": "800000000000000000"
+    },
+    "threshold_decrease_funding": {
+      "$bigint": "0"
+    },
+    "threshold_stable_funding": {
+      "$bigint": "40000000000000000"
+    }
+  },
+  "hasTraderState": false,
+  "hasClaimableCredit": true,
+  "signedTransactions": 0,
+  "liveAdmitted": false,
+  "scope": "Read-only identity and configuration observations from the actual market. Successful historical trader-payment accounting is absent from this inspected ABI. No oracle report credentials, venue upgrade, Testnet deployment or admission is claimed."
+}

@@ -1,0 +1,50 @@
+import { readFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { Spec } from "@stellar/stellar-sdk/contract";
+import { V6_BUILD_ARTIFACTS } from "../packages/sdk/src/generated/specs-v6.ts";
+for (const [name, artifact] of Object.entries(V6_BUILD_ARTIFACTS)) {
+  const wasm = await readFile(
+    `contracts/target/wasm32v1-none/release/dogstar_${name}.wasm`,
+  );
+  const entries = Spec.fromWasm(wasm).entries.map((entry) =>
+    entry.toXDR("base64"),
+  );
+  if (
+    createHash("sha256").update(JSON.stringify(entries)).digest("hex") !==
+    artifact.interfaceHash
+  )
+    throw new Error(`Generated ABI drift: ${name}`);
+}
+console.log(
+  "Current compiled interfaces match the versioned SDK. Compiler-specific code hashes are checked separately during deployment.",
+);
+
+const { PROFILE_BUILD_ARTIFACT } =
+  await import("../packages/sdk/src/generated/profile-v1.ts");
+const profile = Spec.fromWasm(
+  await readFile(
+    "contracts/target/wasm32v1-none/release/dogstar_player_profile.wasm",
+  ),
+);
+if (
+  createHash("sha256")
+    .update(
+      JSON.stringify(profile.entries.map((entry) => entry.toXDR("base64"))),
+    )
+    .digest("hex") !== PROFILE_BUILD_ARTIFACT.interfaceHash
+)
+  throw new Error("Profile ABI drift.");
+const { ZENEX_BUILD_ARTIFACTS } =
+  await import("../packages/sdk/src/generated/zenex-v1.ts");
+for (const [name, artifact] of Object.entries(ZENEX_BUILD_ARTIFACTS)) {
+  const spec = Spec.fromWasm(
+    await readFile(
+      `contracts/target/wasm32v1-none/release/dogstar_${name}.wasm`,
+    ),
+  );
+  const actual = createHash("sha256")
+    .update(JSON.stringify(spec.entries.map((e) => e.toXDR("base64"))))
+    .digest("hex");
+  if (actual !== artifact.interfaceHash)
+    throw new Error(`Experimental Zenex ABI drift: ${name}`);
+}

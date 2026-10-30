@@ -1,0 +1,14 @@
+{
+  "beforeFeeStroops": "2448589295",
+  "afterFeeStroops": "311369",
+  "minResourceFee": "311269",
+  "factory": "CDKSXDNIIJWRI7KGGEA6H4SWN7UEA4IGR54Z4QRXDFSRI6XJ2OCVMM2M",
+  "roundWasmHash": "85925ce4c7a3755c441a4c07a6ae4e02051cd1224813603343647c7d9dc8f337",
+  "network": "TESTNET",
+  "signed": false,
+  "submitted": false,
+  "scope": "Comparable unsigned cash-round creation simulations on Stellar Testnet; not a Mainnet price guarantee",
+  "leaseLedgers": 120960,
+  "nominalLeaseDays": 7,
+  "restoration": "Archived persistent entries retain recoverable state; permissionless maintenance and restoration are required for inactive periods."
+}

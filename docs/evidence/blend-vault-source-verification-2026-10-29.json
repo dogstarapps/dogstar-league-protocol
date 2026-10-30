@@ -1,0 +1,22 @@
+{
+  "scope": "Standalone adapter/vault source and local pool fixture; not live pool admission",
+  "checks": [
+    "actual b-share accounting (initial b-rate differs from one)",
+    "withdrawal delta and yield without global auth bypass",
+    "handover remains available while pool fixture is frozen",
+    "provider controls recovery after handover",
+    "idle donations are excluded from competitive recovery"
+  ],
+  "testCount": 3,
+  "poolAbi": {
+    "address": "CDVQVKOY2YSXS2IC7KN6MNASSHPAO7UN2UR2ON4OI2SKMFJNVAMDX6DP",
+    "fetchedWasmHash": "baf978f10efdbcd85747868bef8832845ea6809f7643b67a4ac0cd669327fc2c"
+  },
+  "remaining": [
+    "tournament position accounting",
+    "real deployed pool admission",
+    "cross-asset swap integration",
+    "live frontend controls"
+  ],
+  "thirdPartyImplementationPublished": false
+}

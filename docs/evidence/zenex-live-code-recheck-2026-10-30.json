@@ -1,0 +1,10 @@
+{
+  "checkedAt": "2026-10-30T08:44:18.537Z",
+  "market": "CAOZCITWHWAXH5FRU4EULQ5EN2HMTCHICRNC4R5ZAOVD7XHCCQSJ42IB",
+  "network": "PUBLIC",
+  "latestLedger": 65212814,
+  "codeHash": "02aa342f5e6e084c8e5728b74aee77864f77ea720896e61a689da8252f95943c",
+  "matchesPriorInspection": true,
+  "signedTransactions": 0,
+  "scope": "Read-only current on-chain contract identity recheck; existing fetched ABI hash matches the current code. No Mainnet transaction was signed or submitted."
+}

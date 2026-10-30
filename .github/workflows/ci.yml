@@ -26,3 +26,9 @@ jobs:
           targets: wasm32v1-none
       - run: cargo build --manifest-path contracts/Cargo.toml --locked --target wasm32v1-none --release -j 2
       - run: cargo test --manifest-path contracts/Cargo.toml --locked -j 2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.22.1
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run check:bindings

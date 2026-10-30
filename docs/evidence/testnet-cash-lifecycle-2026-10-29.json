@@ -1,0 +1,175 @@
+{
+  "network": "TESTNET",
+  "scope": "Native cash lifecycle only; no live DEX, lending or perpetual venue certification",
+  "round": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L",
+  "startedAt": "2026-10-29T18:12:57.626Z",
+  "finishedAt": "2026-10-29T18:17:36.653Z",
+  "phase": 5,
+  "transactions": [
+    {
+      "method": "create",
+      "hash": "038ed88642c4eceb370c1813d3a21fe9a04ce4f0da47eca5be28ac0e0d058e80"
+    },
+    {
+      "method": "contribute",
+      "hash": "f2a467ec9b6c3adb22d3fbe13fb662dd14c068dad53e51ef2bd318a9896a1549"
+    },
+    {
+      "method": "contribute",
+      "hash": "0013dcdd3a7e34aa0b984d1b032195722bb79b720a5a4ac84068d07243c0fcd1"
+    },
+    {
+      "method": "contribute",
+      "hash": "956571d7cf015e09ade99152df888f09179fc37f0de523fbe4a978c54ee1be0a"
+    },
+    {
+      "method": "pre_register",
+      "hash": "517cb039d1642e63733a3979380f40c111f3681d0b28f6cb189fd01f81930b06"
+    },
+    {
+      "method": "pre_register",
+      "hash": "15dbf035555848a573384e8db2e34bebda8b85c45561558a933efc8f9bf7c1f1"
+    },
+    {
+      "method": "claim",
+      "hash": "9609f779468f0f83fcd83f31cf50a537a974f9e1e15e2bea6887ae0b5b4493df"
+    },
+    {
+      "method": "claim",
+      "hash": "795b3de3fdaa09e4fc553a8982ada511b58a0ad27073af2c208e23b574af8e55"
+    },
+    {
+      "method": "sponsor_claim",
+      "hash": "144a83a1945eaa16e8c1f333111fb9bbb2337a8512fbf7b684b24e9d22486457"
+    },
+    {
+      "method": "sponsor_claim",
+      "hash": "bd93ec9d3de3ea43e22d7a4f4675760cf8cc4f18b9106fd39b6c40448fba2aa4"
+    },
+    {
+      "method": "sponsor_claim",
+      "hash": "69df2e4f2bbc09710d52119bcbc1d377df2ca190543a0ff35817ab0d741f08a2"
+    }
+  ],
+  "executor": [
+    {
+      "hash": "f13d8ae0c886e8a8df895b37f7ef089ecdc224e48bb709a24081fbf3570179b2",
+      "task": {
+        "round": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L",
+        "method": "advance",
+        "args": {
+          "operator": "GASI5ZPQHRTDBKWZRQL63NMOOVUKL7QFRVX6ZNZGOB4YAYVDK6WRWTIQ"
+        },
+        "key": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L:advance:0"
+      },
+      "status": "SUCCESS"
+    },
+    {
+      "hash": "9aa14ac7509fbfaeaa60e90f0fa324664f3b6398b96e6b4a59aa8543399631dc",
+      "task": {
+        "round": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L",
+        "method": "advance",
+        "args": {
+          "operator": "GASI5ZPQHRTDBKWZRQL63NMOOVUKL7QFRVX6ZNZGOB4YAYVDK6WRWTIQ"
+        },
+        "key": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L:advance:1"
+      },
+      "status": "SUCCESS"
+    },
+    {
+      "hash": "8adb775527bbd5145c799e5cb675eeac529e916f354aefb7079292a1d09fd058",
+      "task": {
+        "round": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L",
+        "method": "advance",
+        "args": {
+          "operator": "GASI5ZPQHRTDBKWZRQL63NMOOVUKL7QFRVX6ZNZGOB4YAYVDK6WRWTIQ"
+        },
+        "key": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L:advance:2"
+      },
+      "status": "SUCCESS"
+    },
+    {
+      "hash": "1dae386b8688052f25d44dd26bd2f424e2c6f78e21e0c54b54b37a476bdb8930",
+      "task": {
+        "round": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L",
+        "method": "advance",
+        "args": {
+          "operator": "GASI5ZPQHRTDBKWZRQL63NMOOVUKL7QFRVX6ZNZGOB4YAYVDK6WRWTIQ"
+        },
+        "key": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L:advance:3"
+      },
+      "status": "SUCCESS"
+    },
+    {
+      "hash": "26499b8d6e520da86d0166bab456acc458eca6d8532615841710bfcee1d3e646",
+      "task": {
+        "round": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L",
+        "method": "settle_player",
+        "args": {
+          "p": "GBDHVKMYUD3B3L7TU2F5KMNHJJDPS4PKUL3M3AS4GCRP3ZI5ZWU2ZS42",
+          "operator": "GASI5ZPQHRTDBKWZRQL63NMOOVUKL7QFRVX6ZNZGOB4YAYVDK6WRWTIQ"
+        },
+        "key": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L:settle:GBDHVKMYUD3B3L7TU2F5KMNHJJDPS4PKUL3M3AS4GCRP3ZI5ZWU2ZS42"
+      },
+      "status": "SUCCESS"
+    },
+    {
+      "hash": "89192b8747f7b4a388f465ed76f8c16112e337195b6c643ed4f4f45b1bd177bd",
+      "task": {
+        "round": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L",
+        "method": "settle_player",
+        "args": {
+          "p": "GARHWDPRNQ24IY3XEXF3DHS6WFAZ3Z7QVK5GUMJSL22URG6SKROEEVCW",
+          "operator": "GASI5ZPQHRTDBKWZRQL63NMOOVUKL7QFRVX6ZNZGOB4YAYVDK6WRWTIQ"
+        },
+        "key": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L:settle:GARHWDPRNQ24IY3XEXF3DHS6WFAZ3Z7QVK5GUMJSL22URG6SKROEEVCW"
+      },
+      "status": "SUCCESS"
+    },
+    {
+      "hash": "65c534c4d1b070034c47c7cdff32f2b04d678e1e781268b28f6a8df0656f9462",
+      "task": {
+        "round": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L",
+        "method": "finalize",
+        "args": {
+          "operator": "GASI5ZPQHRTDBKWZRQL63NMOOVUKL7QFRVX6ZNZGOB4YAYVDK6WRWTIQ"
+        },
+        "key": "CDPCOFSCND45AMUQZAXU55SNQH3I4DYSJHPUXLZESDYWOJTX37YGS56L:finalize"
+      },
+      "status": "SUCCESS"
+    }
+  ],
+  "manifest": {
+    "schemaVersion": 1,
+    "network": "TESTNET",
+    "environment": "testnet",
+    "rpcUrl": "https://soroban-testnet.stellar.org",
+    "readSource": "GASI5ZPQHRTDBKWZRQL63NMOOVUKL7QFRVX6ZNZGOB4YAYVDK6WRWTIQ",
+    "registry": {
+      "address": "CDKZY6TRQTBTUVEL6VOD4XEJRZOBPK6MJ2G7CE2ITEBAI2CSVVBWNINP",
+      "wasmHash": "a5e725690923df521995baee448aa26d9df9cfc6561b8e0493232637ecfee258",
+      "interfaceHash": "cced0b4fec7bed556974a3f2931e638e96b0a3975a06f813e758be33fd32b8aa"
+    },
+    "factory": {
+      "address": "CA6RGTOEMMDGJ2EJ4YEMX5DUXT5WBDICK42TR42OLHE6PQZNHYDBKFQK",
+      "wasmHash": "c1b79a7c1bdbf6afe90124c5ad02d052c917066e994599f29cf673aeee0db660",
+      "interfaceHash": "633e52c617a3f5f6adf04014bb1d3b47e11846f4c61d83e04ae859348f6370a0"
+    },
+    "tournament": {
+      "wasmHash": "247595bc461f9365fff943ebd685a0ffeeb75860c46babcf47cc693a306a774a",
+      "interfaceHash": "b9c01304c21ffcc43b4d4967d9c358f14f9602af78d0621162c9487ed1604b77"
+    },
+    "quotePolicy": {
+      "address": "CDLTRNW2IXU4FN5IFO2FNIJWJWK5R7NJLG55XEA37ZRNYVYFYPDAV6OG",
+      "wasmHash": "8ece8aecc51748ac4baf2e13bdc1f9eb6c9d90c28243d69a8a37322cbbc2eea8"
+    },
+    "cash": {
+      "address": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+      "symbol": "XLM",
+      "decimals": 7
+    },
+    "protocols": [],
+    "deployedAt": "2026-10-29T18:11:01.131Z"
+  },
+  "result": "Two signed registrations; permissionless calendar transitions and settlement; player and contributor claims succeeded."
+}

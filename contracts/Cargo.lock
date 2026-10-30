@@ -518,6 +518,49 @@ dependencies = [
 ]
 
 [[package]]
+name = "dogstar-blend-adapter"
+version = "0.4.0"
+dependencies = [
+ "dogstar-external-interfaces",
+ "dogstar-protocol-types",
+ "dogstar-vault-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-blend-vault"
+version = "0.4.0"
+dependencies = [
+ "dogstar-external-interfaces",
+ "dogstar-protocol-types",
+ "dogstar-vault-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-cash-policy"
+version = "0.3.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-direct-swap"
+version = "0.4.1"
+dependencies = [
+ "dogstar-protocol-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-exit-facility"
+version = "0.3.0"
+dependencies = [
+ "dogstar-protocol-types",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "dogstar-external-interfaces"
 version = "0.2.0"
 dependencies = [
@@ -526,9 +569,43 @@ dependencies = [
 
 [[package]]
 name = "dogstar-factory"
-version = "0.2.0"
+version = "0.5.0"
 dependencies = [
  "dogstar-protocol-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-lp-adapter"
+version = "0.4.1"
+dependencies = [
+ "dogstar-lp-types",
+ "dogstar-lp-vault",
+ "dogstar-protocol-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-lp-types"
+version = "0.4.1"
+dependencies = [
+ "dogstar-vault-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-lp-vault"
+version = "0.4.1"
+dependencies = [
+ "dogstar-lp-types",
+ "dogstar-protocol-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-player-profile"
+version = "0.1.0"
+dependencies = [
  "soroban-sdk",
 ]
 
@@ -542,7 +619,7 @@ dependencies = [
 
 [[package]]
 name = "dogstar-protocol-types"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "soroban-sdk",
 ]
@@ -565,10 +642,53 @@ dependencies = [
 ]
 
 [[package]]
+name = "dogstar-spot-receipt"
+version = "0.3.0"
+dependencies = [
+ "dogstar-protocol-types",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "dogstar-tournament"
+version = "0.5.0"
+dependencies = [
+ "dogstar-external-interfaces",
+ "dogstar-protocol-types",
+ "dogstar-vault-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-vault-types"
+version = "0.4.0"
+dependencies = [
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-zenex-adapter"
 version = "0.1.0"
 dependencies = [
  "dogstar-protocol-types",
+ "dogstar-zenex-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-zenex-types"
+version = "0.1.0"
+dependencies = [
+ "dogstar-vault-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-zenex-vault"
+version = "0.1.0"
+dependencies = [
+ "dogstar-protocol-types",
+ "dogstar-zenex-types",
  "soroban-sdk",
 ]
 

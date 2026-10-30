@@ -1,5 +1,9 @@
 #![no_std]
-use dogstar_protocol_types::{Config, ProtocolSelection, ProtocolVersion, RoundRecord};
+// Renew a bounded seven-day lease at the nominal five-second ledger cadence.
+// Archived entries remain restorable; never prepay the network maximum on each write.
+use dogstar_protocol_types::{
+    Config, ExitArtifacts, ProtocolSelection, ProtocolVersion, RoundRecord,
+};
 use soroban_sdk::{
     contract, contractclient, contractevent, contractimpl, contracttype, xdr::ToXdr, Address,
     BytesN, Env, Symbol, Vec,
@@ -9,12 +13,22 @@ pub trait Registry {
     fn get(e: Env, id: Symbol, version: u32) -> ProtocolVersion;
     fn available(e: Env, id: Symbol, version: u32) -> bool;
 }
+#[contractclient(name = "CapabilitiesClient")]
+pub trait Capabilities {
+    fn capabilities(e: Env) -> u32;
+}
+#[contractclient(name = "FundingClient")]
+pub trait Funding {
+    fn contribute(e: Env, owner: Address, bucket: u32, n: i128) -> u32;
+}
 #[contracttype]
 #[derive(Clone)]
 enum Key {
     Registry,
     RoundWasm,
     QuotePolicy,
+    Cash,
+    ExitArtifacts,
     Count,
     Round(u32),
     ByAddress(Address),
@@ -34,10 +48,21 @@ pub struct RoundCreated {
 pub struct Factory;
 #[contractimpl]
 impl Factory {
-    pub fn __constructor(e: Env, registry: Address, round_wasm: BytesN<32>, quote_policy: Address) {
+    pub fn __constructor(
+        e: Env,
+        registry: Address,
+        round_wasm: BytesN<32>,
+        quote_policy: Address,
+        cash: Address,
+        exit_artifacts: ExitArtifacts,
+    ) {
         e.storage().instance().set(&Key::Registry, &registry);
         e.storage().instance().set(&Key::RoundWasm, &round_wasm);
         e.storage().instance().set(&Key::QuotePolicy, &quote_policy);
+        e.storage().instance().set(&Key::Cash, &cash);
+        e.storage()
+            .instance()
+            .set(&Key::ExitArtifacts, &exit_artifacts);
         e.storage().instance().set(&Key::Count, &0u32);
     }
     pub fn create(
@@ -48,6 +73,17 @@ impl Factory {
         metadata_hash: BytesN<32>,
     ) -> Address {
         c.creator.require_auth();
+        let cash: Address = e.storage().instance().get(&Key::Cash).unwrap();
+        assert!(c.cash == cash, "unapproved_settlement_asset");
+        let approved: ExitArtifacts = e.storage().instance().get(&Key::ExitArtifacts).unwrap();
+        if let Some(exit) = c.exit.terms() {
+            assert!(approved == exit.artifacts, "unapproved_exit_contracts");
+        } else {
+            assert!(
+                c.adapters.is_empty() && c.assets.len() == 1,
+                "exit_coverage_required"
+            );
+        }
         assert!(
             selections.len() == c.adapters.len() && selections.len() <= 5,
             "adapter_selection_mismatch"
@@ -70,6 +106,10 @@ impl Factory {
             );
             let p = client.get(&selection.id, &selection.version);
             assert!(
+                CapabilitiesClient::new(&e, &p.adapter).capabilities() == p.capabilities,
+                "capability_manifest_mismatch"
+            );
+            assert!(
                 c.adapters.contains(&p.adapter) && !adapters.contains(&p.adapter),
                 "invalid_adapter"
             );
@@ -88,6 +128,7 @@ impl Factory {
             .deploy_v2(wasm, (c.clone(),));
         let id: u32 = e.storage().instance().get(&Key::Count).unwrap();
         let record = RoundRecord {
+            creator_funded: false,
             id,
             address: address.clone(),
             creator: c.creator.clone(),
@@ -102,7 +143,7 @@ impl Factory {
             .persistent()
             .set(&Key::ByAddress(address.clone()), &id);
         e.storage().persistent().set(&salt_key, &address);
-        let n = e.storage().max_ttl();
+        let n = e.storage().max_ttl().min(120_960);
         for key in [k, salt_key, Key::ByAddress(address.clone())] {
             e.storage().persistent().extend_ttl(&key, n / 2, n);
         }
@@ -117,18 +158,57 @@ impl Factory {
         .publish(&e);
         address
     }
+    pub fn create_funded(
+        e: Env,
+        c: Config,
+        selections: Vec<ProtocolSelection>,
+        salt: BytesN<32>,
+        metadata_hash: BytesN<32>,
+    ) -> Address {
+        assert!(
+            c.calendar.funding_open <= e.ledger().timestamp(),
+            "funding_not_open"
+        );
+        let address = Self::create(e.clone(), c.clone(), selections, salt, metadata_hash);
+        let client = FundingClient::new(&e, &address);
+        for (bucket, amount) in [
+            (0u32, c.capital.checked_mul(c.max_players as i128).unwrap()),
+            (1u32, c.prizes),
+            (2u32, c.execution),
+        ] {
+            if amount > 0 {
+                client.contribute(&c.creator, &bucket, &amount);
+            }
+        }
+        let id: u32 = e
+            .storage()
+            .persistent()
+            .get(&Key::ByAddress(address.clone()))
+            .unwrap();
+        let mut record = Self::get(e.clone(), id);
+        record.creator_funded = true;
+        e.storage().persistent().set(&Key::Round(id), &record);
+        address
+    }
     pub fn get(e: Env, id: u32) -> RoundRecord {
         let k = Key::Round(id);
         let r = e.storage().persistent().get(&k).unwrap();
-        let n = e.storage().max_ttl();
+        let n = e.storage().max_ttl().min(120_960);
         e.storage().persistent().extend_ttl(&k, n / 2, n);
         e.storage().instance().extend_ttl(n / 2, n);
         r
     }
     pub fn count(e: Env) -> u32 {
-        let n = e.storage().max_ttl();
+        let n = e.storage().max_ttl().min(120_960);
         e.storage().instance().extend_ttl(n / 2, n);
         e.storage().instance().get(&Key::Count).unwrap()
+    }
+    pub fn find(e: Env, address: Address) -> RoundRecord {
+        let key = Key::ByAddress(address);
+        let id: u32 = e.storage().persistent().get(&key).unwrap();
+        let n = e.storage().max_ttl().min(120_960);
+        e.storage().persistent().extend_ttl(&key, n / 2, n);
+        Self::get(e, id)
     }
     pub fn page(e: Env, offset: u32, limit: u32) -> Vec<RoundRecord> {
         assert!(limit <= 50, "page_limit");

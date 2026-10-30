@@ -1,8 +1,9 @@
 use super::*;
-use dogstar_protocol_types::Calendar;
+use dogstar_protocol_types::{AccessRule, Calendar, ExitPolicy, ExitTerms, RoundAccess};
 use soroban_sdk::{
     testutils::{Address as _, Ledger},
-    vec,
+    token::StellarAssetClient,
+    vec, IntoVal,
 };
 
 // The verification command builds this WASM from the current locked sources first.
@@ -40,6 +41,9 @@ impl Policy {
 struct Adapter;
 #[contractimpl]
 impl Adapter {
+    pub fn capabilities() -> u32 {
+        1
+    }
     pub fn ping() {}
 }
 #[contractclient(name = "RoundClient")]
@@ -79,9 +83,26 @@ fn setup() -> Setup {
     };
     let registry = e.register(RegistryFixture, (p,));
     let wasm = e.deployer().upload_contract_wasm(ROUND_WASM);
-    let factory = e.register(Factory, (registry.clone(), wasm, policy.clone()));
+    let artifacts = ExitArtifacts {
+        facility_wasm: e.deployer().upload_contract_wasm(
+            &include_bytes!("../../target/wasm32v1-none/release/dogstar_exit_facility.wasm")[..],
+        ),
+        spot_receipt_wasm: e.deployer().upload_contract_wasm(
+            &include_bytes!("../../target/wasm32v1-none/release/dogstar_spot_receipt.wasm")[..],
+        ),
+    };
+    let factory = e.register(
+        Factory,
+        (
+            registry.clone(),
+            wasm,
+            policy.clone(),
+            cash.clone(),
+            artifacts.clone(),
+        ),
+    );
     let c = Config {
-        creator,
+        creator: creator.clone(),
         cash: cash.clone(),
         assets: vec![&e, cash],
         adapters: vec![&e, adapter],
@@ -93,6 +114,14 @@ fn setup() -> Setup {
         prizes: 100,
         execution: 100,
         reward: 1,
+        access: RoundAccess::open(),
+        exit: ExitPolicy::Covered(ExitTerms {
+            provider: creator,
+            fallback_bps: 10000,
+            premium_bps: 0,
+            minimum_coverage: 2000,
+            artifacts,
+        }),
         calendar: Calendar {
             funding_open: 1,
             funding_close: 20,
@@ -166,4 +195,193 @@ fn unauthorized_creator_unapproved_policy_and_mismatched_selection_fail() {
     s.e.mock_auths(&[]);
     assert!(c.try_create(&s.c, &s.selections, &salt, &metadata).is_err());
     assert_eq!(c.count(), 0);
+}
+#[test]
+fn creator_funding_is_atomic_and_requires_consent_for_all_three_budgets() {
+    use soroban_sdk::testutils::{MockAuth, MockAuthInvoke};
+    let s = setup();
+    let factory = FactoryClient::new(&s.e, &s.factory);
+    let salt = BytesN::from_array(&s.e, &[8; 32]);
+    let metadata = BytesN::from_array(&s.e, &[9; 32]);
+    let deploy_salt: BytesN<32> =
+        s.e.crypto()
+            .sha256(&(s.c.creator.clone(), salt.clone()).to_xdr(&s.e))
+            .into();
+    let address = s.e.as_contract(&s.factory, || {
+        s.e.deployer()
+            .with_current_contract(deploy_salt)
+            .deployed_address()
+    });
+    StellarAssetClient::new(&s.e, &s.c.cash).mint(&s.c.creator, &2200);
+    let leaves = [
+        MockAuthInvoke {
+            contract: &s.c.cash,
+            fn_name: "transfer",
+            args: (s.c.creator.clone(), address.clone(), 2000i128).into_val(&s.e),
+            sub_invokes: &[],
+        },
+        MockAuthInvoke {
+            contract: &s.c.cash,
+            fn_name: "transfer",
+            args: (s.c.creator.clone(), address.clone(), 100i128).into_val(&s.e),
+            sub_invokes: &[],
+        },
+        MockAuthInvoke {
+            contract: &s.c.cash,
+            fn_name: "transfer",
+            args: (s.c.creator.clone(), address.clone(), 100i128).into_val(&s.e),
+            sub_invokes: &[],
+        },
+    ];
+    let calls = [
+        MockAuthInvoke {
+            contract: &address,
+            fn_name: "__constructor",
+            args: (s.c.clone(),).into_val(&s.e),
+            sub_invokes: &[],
+        },
+        MockAuthInvoke {
+            contract: &address,
+            fn_name: "contribute",
+            args: (s.c.creator.clone(), 0u32, 2000i128).into_val(&s.e),
+            sub_invokes: &leaves[0..1],
+        },
+        MockAuthInvoke {
+            contract: &address,
+            fn_name: "contribute",
+            args: (s.c.creator.clone(), 1u32, 100i128).into_val(&s.e),
+            sub_invokes: &leaves[1..2],
+        },
+        MockAuthInvoke {
+            contract: &address,
+            fn_name: "contribute",
+            args: (s.c.creator.clone(), 2u32, 100i128).into_val(&s.e),
+            sub_invokes: &leaves[2..3],
+        },
+    ];
+    s.e.mock_auths(&[MockAuth {
+        address: &s.c.creator,
+        invoke: &MockAuthInvoke {
+            contract: &s.factory,
+            fn_name: "create_funded",
+            args: (
+                s.c.clone(),
+                s.selections.clone(),
+                salt.clone(),
+                metadata.clone(),
+            )
+                .into_val(&s.e),
+            sub_invokes: &calls,
+        },
+    }]);
+    assert_eq!(
+        factory.create_funded(&s.c, &s.selections, &salt, &metadata),
+        address
+    );
+    assert!(factory.get(&0).creator_funded);
+    assert_eq!(
+        soroban_sdk::token::Client::new(&s.e, &s.c.cash).balance(&address),
+        2200
+    );
+    assert_eq!(
+        soroban_sdk::token::Client::new(&s.e, &s.c.cash).balance(&s.c.creator),
+        0
+    );
+    s.e.mock_all_auths();
+    assert!(FundingClient::new(&s.e, &address)
+        .try_contribute(&s.c.creator, &0, &1)
+        .is_err());
+}
+#[test]
+fn insufficient_creator_funding_rolls_back_creation_and_keeps_the_salt_reusable() {
+    let s = setup();
+    let factory = FactoryClient::new(&s.e, &s.factory);
+    let salt = BytesN::from_array(&s.e, &[8; 32]);
+    let metadata = BytesN::from_array(&s.e, &[9; 32]);
+    StellarAssetClient::new(&s.e, &s.c.cash).mint(&s.c.creator, &2199);
+    assert!(factory
+        .try_create_funded(&s.c, &s.selections, &salt, &metadata)
+        .is_err());
+    assert_eq!(factory.count(), 0);
+    assert_eq!(
+        soroban_sdk::token::Client::new(&s.e, &s.c.cash).balance(&s.c.creator),
+        2199
+    );
+    StellarAssetClient::new(&s.e, &s.c.cash).mint(&s.c.creator, &1);
+    factory.create_funded(&s.c, &s.selections, &salt, &metadata);
+    assert_eq!(factory.count(), 1);
+}
+
+#[test]
+fn malformed_or_unfillable_access_is_rejected_before_canonical_publication() {
+    let s = setup();
+    let c = FactoryClient::new(&s.e, &s.factory);
+    let wallet = Address::generate(&s.e);
+    let mut oversized = Vec::new(&s.e);
+    for _ in 0..101 {
+        oversized.push_back(Address::generate(&s.e));
+    }
+    let invalid = vec![
+        &s.e,
+        AccessRule::Allowlist(vec![&s.e]),
+        AccessRule::Allowlist(vec![&s.e, wallet.clone(), wallet.clone()]),
+        AccessRule::Allowlist(oversized),
+    ];
+    for rule in invalid.iter() {
+        let mut config = s.c.clone();
+        config.access.funding = rule;
+        assert!(c
+            .try_create(
+                &config,
+                &s.selections,
+                &BytesN::from_array(&s.e, &[22; 32]),
+                &BytesN::from_array(&s.e, &[23; 32])
+            )
+            .is_err());
+        assert_eq!(c.count(), 0);
+    }
+    for rule in [
+        AccessRule::CreatorOnly,
+        AccessRule::Allowlist(vec![&s.e, wallet]),
+    ] {
+        let mut config = s.c.clone();
+        config.access.participation = rule;
+        config.min_players = 2;
+        assert!(c
+            .try_create(
+                &config,
+                &s.selections,
+                &BytesN::from_array(&s.e, &[22; 32]),
+                &BytesN::from_array(&s.e, &[23; 32])
+            )
+            .is_err());
+        assert_eq!(c.count(), 0);
+    }
+}
+
+#[test]
+fn atomic_creator_funding_cannot_bypass_the_immutable_contributor_allowlist() {
+    let s = setup();
+    let c = FactoryClient::new(&s.e, &s.factory);
+    let mut config = s.c.clone();
+    config.access.funding = AccessRule::Allowlist(vec![&s.e, Address::generate(&s.e)]);
+    StellarAssetClient::new(&s.e, &config.cash).mint(&config.creator, &10000);
+    let before = soroban_sdk::token::Client::new(&s.e, &config.cash).balance(&config.creator);
+    let salt = BytesN::from_array(&s.e, &[24; 32]);
+    let meta = BytesN::from_array(&s.e, &[25; 32]);
+    assert!(c
+        .try_create_funded(&config, &s.selections, &salt, &meta)
+        .is_err());
+    assert_eq!(c.count(), 0);
+    assert_eq!(
+        soroban_sdk::token::Client::new(&s.e, &config.cash).balance(&config.creator),
+        before
+    );
+    config.access.funding = AccessRule::CreatorOnly;
+    let round = c.create_funded(&config, &s.selections, &salt, &meta);
+    assert_eq!(c.count(), 1);
+    assert_eq!(
+        RoundClient::new(&s.e, &round).config().access.funding,
+        AccessRule::CreatorOnly
+    );
 }

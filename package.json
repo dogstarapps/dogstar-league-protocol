@@ -1,6 +1,6 @@
 {
   "name": "@dogstar-league/protocol",
-  "version": "0.2.0",
+  "version": "0.6.0",
   "description": "Dogstar League Soroban contracts, SDK, adapters and public executor",
   "type": "module",
   "license": "Apache-2.0",
@@ -40,7 +40,8 @@
     "executor:demo": "tsx packages/executor/src/cli.ts",
     "build:contracts": "cargo build --manifest-path contracts/Cargo.toml --locked --target wasm32v1-none --release -j 2",
     "test:contracts": "npm run build:contracts && cargo test --manifest-path contracts/Cargo.toml --locked -j 2",
-    "bindings": "node scripts/generate-bindings.mjs"
+    "bindings": "node scripts/generate-bindings.mjs",
+    "check:bindings": "node scripts/check-bindings.mjs"
   },
   "dependencies": {
     "@stellar/stellar-sdk": "17.4.0"
