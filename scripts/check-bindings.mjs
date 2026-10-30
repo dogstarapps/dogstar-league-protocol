@@ -34,3 +34,17 @@ if (
     .digest("hex") !== PROFILE_BUILD_ARTIFACT.interfaceHash
 )
   throw new Error("Profile ABI drift.");
+const { ZENEX_BUILD_ARTIFACTS } =
+  await import("../packages/sdk/src/generated/zenex-v1.ts");
+for (const [name, artifact] of Object.entries(ZENEX_BUILD_ARTIFACTS)) {
+  const spec = Spec.fromWasm(
+    await readFile(
+      `contracts/target/wasm32v1-none/release/dogstar_${name}.wasm`,
+    ),
+  );
+  const actual = createHash("sha256")
+    .update(JSON.stringify(spec.entries.map((e) => e.toXDR("base64"))))
+    .digest("hex");
+  if (actual !== artifact.interfaceHash)
+    throw new Error(`Experimental Zenex ABI drift: ${name}`);
+}

@@ -32,3 +32,12 @@ factory: 86285a9234d3f0d687eaf88efe8d5d72172b38c9a86624c9934c0cbf2aff2993
 pair: 8447525edd62f72ffaf52136358034657ea0511a8fec1cd0ebde649f86cca464
 https://docs.soroswap.finance/amm/technical-reference/deployed-addresses
 These are interface facts. No fetched implementation binary is redistributed.
+
+Zenex interoperability declarations
+The experimental wrapper's minimal market/order/credit declarations describe
+public ABI facts from read-only inspection of market
+CAOZCITWHWAXH5FRU4EULQ5EN2HMTCHICRNC4R5ZAOVD7XHCCQSJ42IB,
+WASM SHA-256 02aa342f5e6e084c8e5728b74aee77864f77ea720896e61a689da8252f95943c.
+https://github.com/zenith-protocols/zenex-docs
+The required TraderState accounting extension is a proposed interface, absent
+from that inspected market. No third-party implementation is redistributed.

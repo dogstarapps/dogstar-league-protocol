@@ -11,6 +11,31 @@ import { TestnetClient, samePayload } from "./testnet.js";
 const source = Keypair.random().publicKey(),
   contract = StrKey.encodeContract(new Uint8Array(32).fill(1));
 describe("Testnet transport", () => {
+  it("rejects prepared mainnet or foreign-source deployments before requesting a signature", async () => {
+    const c = new TestnetClient({ contractId: contract, source });
+    vi.spyOn(c.server, "getNetwork").mockResolvedValue({
+      passphrase: Networks.TESTNET,
+      protocolVersion: "23",
+    });
+    const signTransaction = vi.fn();
+    const build = (networkPassphrase: string, account = source) =>
+      new TransactionBuilder(new Account(account, "1"), {
+        fee: "100",
+        networkPassphrase,
+      })
+        .addOperation(Operation.manageData({ name: "test", value: "a" }))
+        .setTimeout(60)
+        .build();
+    await expect(
+      c.submitPrepared(build(Networks.PUBLIC), { signTransaction }),
+    ).rejects.toThrow("TESTNET");
+    await expect(
+      c.submitPrepared(build(Networks.TESTNET, Keypair.random().publicKey()), {
+        signTransaction,
+      }),
+    ).rejects.toThrow("source");
+    expect(signTransaction).not.toHaveBeenCalled();
+  });
   it("rejects another network before preparing or requesting a signature", async () => {
     const c = new TestnetClient({ contractId: contract, source });
     vi.spyOn(c.server, "getNetwork").mockResolvedValue({

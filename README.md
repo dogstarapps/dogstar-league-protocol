@@ -28,7 +28,8 @@ Contract deployment tests use the current compiled WASM. Generate current ABI 0.
 - `contracts/exit-facility`, `contracts/spot-receipt`: aggregate reserved exit cash, signed provider terms, explicit strike/premium accounting and residual ownership handover without external venue calls.
 - `contracts/blend-adapter`, `contracts/blend-vault`: isolated supply, actual b-shares, cash-delta recovery and local ownership handover. The official Blend Testnet lifecycle has completed.
 - `contracts/direct-swap`: direct Soroswap pair conversion with pinned router/factory/pair code, exact nested token pulls and actual recipient deltas.
-- `contracts/lp-adapter`, `contracts/lp-vault`: isolated Soroswap LP shares, independent entry value, bounded donation accounting and provider recovery; live conversion/admission remains open.
+- `contracts/lp-adapter`, `contracts/lp-vault`: isolated Soroswap LP shares, independent entry value, bounded donation accounting and provider recovery; the official Testnet conversion, mint/burn, public purchase and provider recovery lifecycle has completed.
+- `contracts/zenex-adapter`, `contracts/zenex-vault`, `contracts/zenex-types`: experimental perpetual positions requiring venue-owned cumulative payment accounting. The inspected Zenex market lacks this getter and remains unadmitted.
 - `contracts/price-policy`: independent SEP-40 prices, fixed token/feed mappings, freshness, timestamp skew and decimal validation.
 - `packages/sdk`: generated WASM schemas, deployment compatibility, typed snapshots, canonical metadata, wallet signing, pending outcomes and restoration preparation.
 - `packages/executor`: permissionless Testnet planning/submission with an operator-owned signer and persistent pending-envelope journal.
@@ -44,9 +45,11 @@ npm run executor -- --manifest=deployments/testnet.json --key-file=/private/oper
 
 The operator supplies their own funded Testnet account and a secret file with mode `0600`. Each operator has their own journal. No Dogstar API or exclusive operator key is required. Signed envelopes are persisted before broadcast. A pending outcome is reconciled by hash, or the exact same signed envelope is rebroadcast; the executor does not rebuild an ambiguous operation. All eligibility and rewards are checked by contracts. The default signing budget is zero; fee caps and the cumulative journal allowance are denominated in native XLM stroops. The executor compares assembled fees with eligible native rewards before signing. `--allow-unprofitable` explicitly permits bounded Testnet maintenance and restoration; it does not bypass the fee cap or cumulative allowance. Failed or ambiguous spend remains allocated conservatively. Ledger races can still cost fees.
 
+Read-only planning, multiple factories, health reporting, backoff and operator setup are documented in the [executor runbook](docs/executor-operations.md). The verified LP manifest is `deployments/testnet-v5-lp.json`.
+
 ## Implementation boundary
 
-This is development software. Local external-market and oracle fixtures do not certify a live venue. Zenex attribution, LP conversion/admission, independent end valuation, scalability and production reviews remain tracked in [implementation status](docs/STATUS.md). Mainnet signing is disabled. A final buyout must assign enforceable residual rights against prefunded aggregate obligations; it cannot unfreeze an external protocol.
+This is development software. Local external-market and oracle fixtures do not certify a live venue. Live Zenex admission, independent end valuation, scalability and production reviews remain tracked in [implementation status](docs/STATUS.md). Mainnet signing is disabled. A final buyout must assign enforceable residual rights against prefunded aggregate obligations; it cannot unfreeze an external protocol.
 
 Player positive profit is calculated individually, separately from sponsor principal. The default share is 100%; configurable shares are immutable round terms. Arbitrary rounds have no MyLab, TERRY, POWER or HAW-AI authority.
 

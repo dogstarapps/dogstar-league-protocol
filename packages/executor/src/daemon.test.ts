@@ -13,6 +13,7 @@ import {
 import { V4_SPEC_ENTRIES } from "../../sdk/src/generated/specs-v4.js";
 import { Executor } from "./daemon.js";
 import { Journal } from "./journal.js";
+import type { ExitRequestProvider } from "./exit-reports.js";
 
 const deployment = JSON.parse(
   readFileSync("deployments/testnet-v3-lease.json", "utf8"),
@@ -77,7 +78,7 @@ const journals: Journal[] = [];
 afterEach(() => {
   journals.splice(0).forEach((journal) => journal.close());
 });
-function executor(positions = [position]) {
+function executor(positions = [position], requests?: ExitRequestProvider) {
   const prepare = vi.fn().mockResolvedValue({});
   const read = vi.fn(async (method: string, args?: { p?: string }) => {
     if (method === "open_orders") return [];
@@ -104,12 +105,77 @@ function executor(positions = [position]) {
   );
   journals.push(journal);
   return {
-    runner: new Executor(client, { signTransaction: vi.fn() }, journal),
+    runner: new Executor(
+      client,
+      { signTransaction: vi.fn() },
+      journal,
+      undefined,
+      requests,
+    ),
     prepare,
     read,
   };
 }
 describe("public managed-position closure", () => {
+  it("uses a complete report when required, while a deadline purchase never waits for that provider", async () => {
+    const provider = vi.fn(async () => new Uint8Array([1, 2]));
+    const { runner, prepare } = executor([position], provider);
+    const perpetual = {
+      ...snapshot,
+      record: {
+        ...snapshot.record,
+        protocols: [{ adapter: position.adapter, capabilities: 24 }],
+      },
+    } as RoundSnapshot;
+    prepare.mockRejectedValueOnce(new Error("Signed close price required"));
+    const task = await runner.next(perpetual, 110n);
+    expect(task?.method).toBe("close_position");
+    expect(task?.args.request).toEqual(new Uint8Array([1, 2]));
+    expect(provider).toHaveBeenCalledOnce();
+    provider.mockClear();
+    prepare.mockClear();
+    expect((await runner.next(perpetual, 120n))?.method).toBe(
+      "buyout_position",
+    );
+    expect(provider).not.toHaveBeenCalled();
+    expect(prepare).not.toHaveBeenCalled();
+  });
+  it("can settle an already forced-close receipt without fetching a report", async () => {
+    const provider = vi.fn(async () => {
+      throw new Error("Provider offline");
+    });
+    const { runner } = executor([position], provider);
+    const perpetual = {
+      ...snapshot,
+      record: {
+        ...snapshot.record,
+        protocols: [{ adapter: position.adapter, capabilities: 24 }],
+      },
+    } as RoundSnapshot;
+    expect((await runner.next(perpetual, 110n))?.method).toBe("close_position");
+    expect(provider).not.toHaveBeenCalled();
+  });
+  it("continues to another player while one close has a fee or venue cooldown", async () => {
+    const { runner, prepare } = executor();
+    runner.journal.fail(
+      {
+        round: snapshot.address,
+        method: "close_position",
+        args: {},
+        key: `${snapshot.address}:position-close:${position.id}`,
+      },
+      new Error("Fee is too high"),
+    );
+    const other = deployment.registry.address;
+    const task = await runner.next(
+      { ...snapshot, registrations: [player, other] },
+      110n,
+    );
+    expect(task?.method).toBe("settle_player");
+    expect(task?.args.p).toBe(other);
+    expect(prepare).not.toHaveBeenCalled();
+    expect((await runner.next(snapshot, 120n))?.method).toBe("buyout_position");
+  });
   it("simulates the native exit before the deadline", async () => {
     const { runner, prepare } = executor();
     expect((await runner.next(snapshot, 110n))?.method).toBe("close_position");

@@ -5,3 +5,4 @@ export * from "./types.js";
 export * from "./metadata.js";
 export * from "./profile.js";
 export * from "./liquidity.js";
+export * from "./zenex.js";

@@ -1,6 +1,6 @@
 # Zenex settlement attribution
 
-Design decision required before admitting Zenex to prize-bearing rounds. The generic cash purchase mechanism is implemented; a Zenex adapter is not yet admitted. No attestation system described here is implemented.
+The user selected option A below. A real venue accounting extension is required before admitting Zenex to prize-bearing rounds. The generic cash purchase mechanism is implemented; a Zenex adapter is not yet admitted. No attestation system described here is implemented.
 
 ## Concrete integration constraint
 
@@ -36,3 +36,6 @@ The independent emergency purchase remains useful under either model. It transfe
 The user selected option A: settlement attribution verifiable in the contract, rather than a threshold of external ranking certifiers. A wallet balance alone cannot distinguish a forced venue payout from a donation. The required venue integration must expose authenticated cumulative per-vault cash settlement, or an equivalent enforceable callback/accounting interface covering liquidation, ADL, cancellation and ordinary settlement. It must handle payouts outside a Dogstar executor transaction.
 
 No adapter may advertise verified Zenex ranking until that real deployed interface is available and tested against the pinned market code. Fixture implementations can validate our accounting rules but do not establish that the current market supports them. Permissionless prefunded cash purchase and local residual ownership remain independent of this ranking dependency.
+
+
+An experimental adapter/vault and seven accounting/authorization tests now implement the selected interface. The inspected deployed market remains incompatible and unadmitted. See [the concrete adapter and venue requirements](zenex-adapter.md) and [current ABI inspection evidence](evidence/zenex-interface-inspection-2026-10-30.json).

@@ -106,7 +106,7 @@ export class TestnetClient {
     hooks: SubmissionHooks = {},
   ) {
     const { transaction } = await this.prepare(method, args);
-    return this.submit(transaction, wallet, hooks);
+    return this.submitPrepared(transaction, wallet, hooks);
   }
   async restore(
     preamble: rpc.Api.SimulateTransactionRestoreResponse["restorePreamble"],
@@ -124,13 +124,24 @@ export class TestnetClient {
       .addOperation(Operation.restoreFootprint({}))
       .setTimeout(60)
       .build();
-    return this.submit(transaction, wallet, hooks);
+    return this.submitPrepared(transaction, wallet, hooks);
   }
-  private async submit(
+  /** Submit a reviewed, simulated Testnet transaction, including deployment operations.
+   * Callers must retain the exact envelope through beforeSubmit before broadcasting. */
+  async submitPrepared(
     transaction: Transaction,
     wallet: WalletSigner,
-    hooks: SubmissionHooks,
+    hooks: SubmissionHooks = {},
   ) {
+    if (
+      transaction.networkPassphrase !== Networks.TESTNET ||
+      (await this.server.getNetwork()).passphrase !== Networks.TESTNET
+    )
+      throw new Error("Only TESTNET is allowed.");
+    if (transaction.source !== this.options.source)
+      throw new Error(
+        "Prepared transaction source differs from the selected signer.",
+      );
     const signed = await wallet.signTransaction(transaction.toXDR(), {
       address: this.options.source,
       networkPassphrase: Networks.TESTNET,
@@ -168,7 +179,7 @@ export class TestnetClient {
       if (tx.status === "FAILED") throw new Error("Transaction failed.");
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
-    return { status: "PENDING", hash: result.hash }; // Unknown outcome must be queried by hash; never blindly resubmit.
+    return { status: "PENDING" as const, hash: result.hash }; // Unknown outcome must be queried by hash; never blindly resubmit.
   }
 }
 

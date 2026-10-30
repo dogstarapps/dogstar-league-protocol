@@ -10,7 +10,7 @@ describe('durable executor reconciliation',()=>{
     const task={round:'round',method:'advance',args:{operator:'operator'},key:'round:advance:0'};
     const envelope={hash:'123',signedXdr:'same-signed-envelope',expiresAt:1000};
     a.save(task,envelope);a.close();
-    const b=new Journal(path,'operator');expect(b.pending()).toEqual([{task,envelope}]);
+    const b=new Journal(path,'operator');expect(b.pending()).toEqual([{task,envelope,status:'PENDING'}]);
     b.finish('123','SUCCESS');expect(b.pending()).toEqual([]);b.close();
     expect(()=>new Journal(path,'another-operator')).toThrow('different signing account');
   });

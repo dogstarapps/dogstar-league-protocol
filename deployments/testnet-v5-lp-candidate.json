@@ -1,0 +1,107 @@
+{
+  "schemaVersion": 1,
+  "protocolVersion": "0.5.0",
+  "exitArtifacts": {
+    "facility_wasm": "e898b92243d8076d6fa7c1a77a7457a0dbaeea29c8ef9c9d6cb4d99d305ac712",
+    "spot_receipt_wasm": "747e4f09c95a6f088760d9b772c19e92e9b8d253744691ccdc632380327bcde4"
+  },
+  "network": "TESTNET",
+  "environment": "testnet",
+  "rpcUrl": "https://soroban-testnet.stellar.org",
+  "readSource": "GASI5ZPQHRTDBKWZRQL63NMOOVUKL7QFRVX6ZNZGOB4YAYVDK6WRWTIQ",
+  "registry": {
+    "address": "CCCUTJPDO47AZBR63BV6O5ECBKMLZT5KOSFOFBKG7ZWKV6KMAFRIZRX7",
+    "wasmHash": "3e9814c335171529b0147250c8cd1da9ca736d225edf6f3304d269ce4a1153ba",
+    "interfaceHash": "ce7b83da6dd9c42ef16a2167b4693d7656c639e0296948c2668b1c651be3f770"
+  },
+  "factory": {
+    "address": "CB27HMEOJVPM75ULEJSSHUJRMYKVRDHBSDCKSNHV3OVELX5H7EP26POK",
+    "wasmHash": "24e4d16f3f5da1c271f83a0bfb6eea67a3210d06b977db568f49c60c96200212",
+    "interfaceHash": "ea9919841be1a9c43112f720535a548ba58c72b345ac4d3944ed373cedfe5ec3"
+  },
+  "tournament": {
+    "wasmHash": "75e1a98e02494f71f3d8d613e919e95a26a96d24418293318eb0fb8cc74c521d",
+    "interfaceHash": "21943981ba5b228e499a8e6286a51dc3cf4f705e6bd23fc69cdb910a6a7f2aed"
+  },
+  "quotePolicy": {
+    "address": "CDPV3MHCQ2R352TPAFIENG4S2UFZN3Q32OIHJQZJM5GTUDULFF4JNX4T",
+    "wasmHash": "2db366db53770bf86b6013ba83e2cf96162b67ac9f6be99eb435a345418b4e0a",
+    "interfaceHash": "375d424e0af09644ae119cbe30aa82377ea86b5aba310829ea8b873be3a2c259"
+  },
+  "cash": {
+    "address": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+    "symbol": "XLM",
+    "decimals": 7
+  },
+  "protocols": [
+    {
+      "id": "blend_supply",
+      "version": 1,
+      "name": "Blend supply",
+      "capabilities": 20,
+      "adapter": "CBT6K3JRAD3N6J5APHRX5PYM7TBK45TBZTH5MUPAEOAKB4OQ3643ROYS",
+      "wasmHash": "b1f4297c6ee8e8cf73d787134c5ef2bd0c1d90df4bbc83ab697f18f2666e0b65",
+      "assets": [
+        {
+          "address": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+          "symbol": "XLM",
+          "decimals": 7
+        }
+      ]
+    },
+    {
+      "id": "soroswap_spot",
+      "version": 1,
+      "name": "Soroswap Spot",
+      "capabilities": 1,
+      "adapter": "CDDNGIYC5KRTOBYDD3WTSOFX5DILJ7ZAW23O55TLALL5QQA4RIPZ55VO",
+      "wasmHash": "0ba7c3b855894287c28057c55e3dd1b6bbf1f189a80ac1df471d21bca8849cec",
+      "assets": [
+        {
+          "address": "CB3TLW74NBIOT3BUWOZ3TUM6RFDF6A4GVIRUQRQZABG5KPOUL4JJOV2F",
+          "symbol": "USDC",
+          "decimals": 7
+        },
+        {
+          "address": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+          "symbol": "XLM",
+          "decimals": 7
+        }
+      ]
+    },
+    {
+      "id": "soroswap_lp",
+      "version": 1,
+      "name": "Soroswap liquidity",
+      "capabilities": 18,
+      "adapter": "CCFULPUJPTVAZJCDLK5LZOTADXVVGRNRBTXCKVW3UFIX457XYRHYMEE3",
+      "wasmHash": "753ddbdeae518ccadaf1ecdceeaa10c3d1a334f70f4d7c91a51a5038002ceebe",
+      "assets": [
+        {
+          "address": "CB3TLW74NBIOT3BUWOZ3TUM6RFDF6A4GVIRUQRQZABG5KPOUL4JJOV2F",
+          "symbol": "USDC",
+          "decimals": 7
+        },
+        {
+          "address": "CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC",
+          "symbol": "XLM",
+          "decimals": 7
+        }
+      ]
+    }
+  ],
+  "deployedAt": "2026-10-30T04:59:01.684Z",
+  "profile": {
+    "address": "CDUPLUUPOIYOYRBZWM5CLX7DZS4D7GRFP5L22YDP55HUWMT54UJ5QZI5",
+    "wasmHash": "05d69e1842506e744319604109500445a1e3cad789747fd6e2388438583bf252",
+    "interfaceHash": "3a106638bc22b37285325ee545d56e9e649dd7e09e18c276118bddf92f33171a",
+    "version": 1
+  },
+  "testnetLp": {
+    "pair": "CDVAIOYHCD4RUSLQNVFI7RIZBFT2JZMJWM4RTOLQZQXL4QAVXU5RFKDB",
+    "source": "https://raw.githubusercontent.com/soroswap/core/main/public/testnet.contracts.json",
+    "tokenSource": "https://raw.githubusercontent.com/soroswap/core/main/public/tokens.json",
+    "assistedPriceAlignment": false,
+    "liveLifecycleVerified": false
+  }
+}

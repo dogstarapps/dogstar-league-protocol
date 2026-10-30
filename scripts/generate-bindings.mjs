@@ -40,6 +40,7 @@ await writeFile(
 console.log(
   "Generated ABI schemas and hashes from current contract WASMs; retained legacy deployment schemas.",
 );
+await import("./generate-zenex-bindings.mjs");
 
 // Profile ABI is independent of immutable tournament deployment ABIs.
 const profileWasm = await readFile(

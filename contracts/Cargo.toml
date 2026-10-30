@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["tournament", "protocol-types", "registry", "factory", "spot-adapter", "price-policy", "external-interfaces", "cash-policy", "exit-facility", "spot-receipt", "vault-types", "blend-vault", "blend-adapter", "lp-types", "lp-vault", "lp-adapter", "direct-swap", "player-profile"]
+members = ["tournament", "protocol-types", "registry", "factory", "spot-adapter", "price-policy", "external-interfaces", "cash-policy", "exit-facility", "spot-receipt", "vault-types", "blend-vault", "blend-adapter", "lp-types", "lp-vault", "lp-adapter", "direct-swap", "player-profile", "zenex-types", "zenex-vault", "zenex-adapter"]
 [workspace.dependencies]
 soroban-sdk = "=23.0.3"
 [profile.release]

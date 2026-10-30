@@ -667,6 +667,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "dogstar-zenex-adapter"
+version = "0.1.0"
+dependencies = [
+ "dogstar-protocol-types",
+ "dogstar-zenex-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-zenex-types"
+version = "0.1.0"
+dependencies = [
+ "dogstar-vault-types",
+ "soroban-sdk",
+]
+
+[[package]]
+name = "dogstar-zenex-vault"
+version = "0.1.0"
+dependencies = [
+ "dogstar-protocol-types",
+ "dogstar-zenex-types",
+ "soroban-sdk",
+]
+
+[[package]]
 name = "downcast-rs"
 version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

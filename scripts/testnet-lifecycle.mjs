@@ -1,10 +1,13 @@
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { Keypair, Networks, TransactionBuilder } from "@stellar/stellar-sdk";
+import { DatabaseSync } from "node:sqlite";
+import { resolve } from "node:path";
 import {
   LeagueClient,
   BoundContract,
   metadataHash,
   stringify,
+  quoteLiquidityEntry,
 } from "../dist/sdk/src/index.js";
 import { Executor } from "../dist/executor/src/daemon.js";
 import { Journal } from "../dist/executor/src/journal.js";
@@ -15,12 +18,24 @@ const d = JSON.parse(
   ),
 );
 const scenario = process.env.DL_TESTNET_SCENARIO ?? "cash";
-if (!["cash", "blend"].includes(scenario))
+if (!["cash", "blend", "lp"].includes(scenario))
   throw new Error("Unknown Testnet scenario.");
 const blend =
   scenario === "blend"
     ? d.protocols.find((p) => p.id === "blend_supply")
     : undefined;
+const lp =
+  scenario === "lp"
+    ? d.protocols.find((p) => p.id === "soroswap_lp")
+    : undefined;
+const strategy = blend ?? lp;
+const externalJournal = process.env.DL_EXTERNAL_EXECUTOR_JOURNAL;
+if (externalJournal && strategy)
+  throw new Error(
+    "External executor verification currently requires a cash-only round.",
+  );
+if (scenario === "lp" && (!lp || d.protocolVersion !== "0.5.0"))
+  throw new Error("Use the admitted LP Testnet candidate manifest.");
 if (
   scenario === "blend" &&
   (!blend || !["0.4.0", "0.5.0"].includes(d.protocolVersion))
@@ -38,6 +53,20 @@ for (const name of ["operator", "player-a", "player-b"])
   keys[name] = Keypair.fromSecret(
     (await readFile(`.local/${name}.secret`, "utf8")).trim(),
   );
+if (externalJournal) {
+  if (!resolve(externalJournal).startsWith(resolve(".local") + "/"))
+    throw new Error("Use a preserved local operator journal.");
+  const db = new DatabaseSync(externalJournal, { readOnly: true });
+  try {
+    const source = db
+      .prepare("SELECT value FROM settings WHERE key='source'")
+      .get()?.value;
+    if (!source || source === keys.operator.publicKey())
+      throw new Error("Use a distinct funded autonomous operator.");
+  } finally {
+    db.close();
+  }
+}
 const signer = (key) => ({
   signTransaction: async (xdr, options) => {
     if (
@@ -108,11 +137,13 @@ async function invoke(c, method, args, key = keys.operator) {
 const now = (await client.ledger()).timestamp;
 const metadata = {
   schemaVersion: 1,
-  name: blend
-    ? creatorFunded
-      ? "Creator-funded Blend Open"
-      : "Blend supply lifecycle verification"
-    : "Protocol lifecycle verification",
+  name: lp
+    ? "Soroswap Liquidity Open"
+    : blend
+      ? creatorFunded
+        ? "Creator-funded Blend Open"
+        : "Blend supply lifecycle verification"
+      : "Protocol lifecycle verification",
   description:
     "On-chain Testnet funding, consent, public execution and claims verification.",
   organizer: { name: "Dogstar protocol verification" },
@@ -128,24 +159,39 @@ const calendar = {
   end: BigInt(now + 320),
   settle_by: BigInt(now + 440),
 };
+// Live AMM quoting and deployment take more than one ledger. Keep a real review window.
+if (lp)
+  Object.assign(calendar, {
+    funding_close: BigInt(now + 45),
+    registration_close: BigInt(now + 60),
+    prepare_by: BigInt(now + 120),
+    start: BigInt(now + 140),
+    risk_cutoff: BigInt(now + 420),
+    end: BigInt(now + 450),
+    settle_by: BigInt(now + 570),
+  });
 const config = {
   creator: keys.operator.publicKey(),
   cash: d.cash.address,
-  assets: [d.cash.address],
-  adapters: blend ? [blend.adapter] : [],
+  assets: lp
+    ? [...new Set([d.cash.address, ...lp.assets.map((a) => a.address)])]
+    : [d.cash.address],
+  adapters: strategy ? [strategy.adapter] : [],
   quote_policy: d.quotePolicy.address,
-  capital: 10000000n,
+  capital: lp ? 100000000n : 10000000n,
   min_players: 2,
   max_players: 2,
   share_bps: 10000,
   prizes: 10000000n,
-  execution: 10000000n,
-  reward: 10000n,
+  execution: lp ? 100000000n : 10000000n,
+  reward: BigInt(
+    process.env.DL_TESTNET_REWARD_STROOPS ?? (lp ? "1000000" : "10000"),
+  ),
   calendar,
 };
 if (["0.3.0", "0.4.0", "0.5.0"].includes(d.protocolVersion))
   config.exit = { tag: "CashOnly" };
-if (blend)
+if (strategy)
   config.exit = {
     tag: "Covered",
     values: [
@@ -153,7 +199,7 @@ if (blend)
         provider: keys.operator.publicKey(),
         fallback_bps: 10000,
         premium_bps: 50,
-        minimum_coverage: 20000000n,
+        minimum_coverage: config.capital * 2n,
         artifacts: Object.fromEntries(
           Object.entries(d.exitArtifacts).map(([k, v]) => [
             k,
@@ -176,7 +222,9 @@ const address = await invoke(
   creatorFunded ? "create_funded" : "create",
   {
     c: config,
-    selections: blend ? [{ id: blend.id, version: blend.version }] : [],
+    selections: strategy
+      ? [{ id: strategy.id, version: strategy.version }]
+      : [],
     salt,
     metadata_hash: await metadataHash(metadata),
   },
@@ -216,13 +264,15 @@ if (!creatorFunded)
       }),
     );
 const terms = await round.read("terms");
-const facilityAddress = blend ? await round.read("exit_facility") : undefined;
+const facilityAddress = strategy
+  ? await round.read("exit_facility")
+  : undefined;
 const facility = facilityAddress
   ? client.facility(facilityAddress, d.exitArtifacts.facility_wasm)
   : undefined;
 if (facility) {
-  await invoke(facility, "fund", { n: 20000000n, terms });
-  proof.coverage = { address: facilityAddress, funded: 20000000n };
+  await invoke(facility, "fund", { n: config.capital * 2n, terms });
+  proof.coverage = { address: facilityAddress, funded: config.capital * 2n };
 }
 for (const name of ["player-a", "player-b"]) {
   const key = keys[name];
@@ -233,38 +283,45 @@ for (const name of ["player-a", "player-b"]) {
     key,
   );
 }
-const journal = new Journal(
-    `${runDir}/executor.sqlite`,
-    keys.operator.publicKey(),
-  ),
-  executor = new Executor(client, signer(keys.operator), journal, {
-    maxFee: 10000000n,
-    totalFeeBudget: 1000000000n,
-    minSurplus: 0n,
-    allowUnprofitable: true,
-  });
+proof.executorJournal = externalJournal;
+const journal = externalJournal
+    ? undefined
+    : new Journal(`${runDir}/executor.sqlite`, keys.operator.publicKey()),
+  executor = journal
+    ? new Executor(client, signer(keys.operator), journal, {
+        maxFee: 10000000n,
+        totalFeeBudget: 1000000000n,
+        minSurplus: 0n,
+        allowUnprofitable: !lp,
+      })
+    : undefined;
 try {
   let opened = false;
-  for (let tick = 0; tick < 120; tick++) {
+  for (let tick = 0; tick < (lp ? 240 : 120); tick++) {
     const ledger = await client.ledger();
     // Keep one actual Blend position open until the emergency-purchase deadline.
     // This verifies the public fallback even when the external pool remains healthy.
     if (!opened || BigInt(ledger.timestamp) >= calendar.settle_by)
-      await executor.tick();
+      await executor?.tick();
     const phase = await round.read("phase");
-    if (blend && phase === 3 && !opened) {
+    if (strategy && phase === 3 && !opened) {
       proof.positions = [];
       for (const name of ["player-a", "player-b"]) {
         const key = keys[name];
         const playerRound = new LeagueClient(d, key.publicKey()).round(address);
+        const n = config.capital / 2n;
+        const quote = lp
+          ? await quoteLiquidityEntry(d, lp.adapter, n)
+          : undefined;
+        if (quote && !quote.eligible) throw new Error(quote.reasons.join(" "));
         const id = await invoke(
           playerRound,
           "open_position",
           {
             p: key.publicKey(),
-            adapter: blend.adapter,
-            n: 5000000n,
-            minimums: [5000000n],
+            adapter: strategy.adapter,
+            n,
+            minimums: quote?.minimums ?? [n],
             request: new Uint8Array(),
           },
           key,
@@ -304,10 +361,10 @@ try {
   for (const name of ["player-a", "player-b"])
     await invoke(round, "claim", { beneficiary: keys[name].publicKey() });
   for (const id of deposits) await invoke(round, "sponsor_claim", { id });
-  if (blend) {
+  if (strategy) {
     const position = proof.positions[1];
     const vault = new BoundContract(
-      "blend_vault",
+      lp ? "lp_vault" : "blend_vault",
       position.vault,
       keys.operator.publicKey(),
       d.rpcUrl,
@@ -315,7 +372,7 @@ try {
     );
     const info = await vault.read("info");
     if (info.controller !== keys.operator.publicKey())
-      throw new Error("Provider did not acquire the actual Blend vault.");
+      throw new Error("Provider did not acquire the actual protocol vault.");
     proof.providerRecovery = await invoke(vault, "native_exit", {
       min_cash: 0n,
       request: new Uint8Array(),
@@ -355,6 +412,6 @@ try {
     }),
   );
 } finally {
-  journal.close();
+  journal?.close();
   for (const actorJournal of actorJournals.values()) actorJournal.close();
 }
