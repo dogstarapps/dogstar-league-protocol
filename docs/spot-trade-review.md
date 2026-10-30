@@ -9,3 +9,6 @@ Quotes expire after thirty seconds and bind round address, accepted terms, adapt
 `prepareSpotLimit` validates positive reserved input/minimum and expiry after now. Risk-increasing orders expire no later than the round's risk cutoff; cash-return orders can expire at trading end. Limit minimums express a future condition and need not match today's venue quote. Full fills require actual eligible net output and an eligible public operator; a chart touching the price does not guarantee execution. Entry premium, sell amount and an operator reward are reserved separately, with the reward funded by the round's execution budget. A fill, expiry or cancellation must not spend another player's closure reservation.
 
 The SDK estimates are not custody authority, a price guarantee or Mainnet admission. The application must keep quotes tied to the currently reviewed form and recheck review validity before asking for a wallet signature.
+
+
+The [actual direct Spot/limit Testnet lifecycle](evidence/testnet-spot-limits-final-coverage-2026-10-30.json) completed market execution, a public limit fill, public native portfolio closure and final claims using a distinct funded operator. All tracked round/facility obligations ended at zero.
