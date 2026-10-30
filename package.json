@@ -1,6 +1,6 @@
 {
   "name": "@dogstar-league/protocol",
-  "version": "0.5.3",
+  "version": "0.5.4",
   "description": "Dogstar League Soroban contracts, SDK, adapters and public executor",
   "type": "module",
   "license": "Apache-2.0",

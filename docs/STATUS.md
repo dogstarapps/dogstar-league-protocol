@@ -1,6 +1,6 @@
 # Implementation status
 
-Current SDK/executor package: 0.5.3. Tournament ABI: 0.5.0. The public protocol and private application/backoffice remain separate. Mainnet signing is disabled.
+Current SDK/executor package: 0.5.4. Tournament ABI: 0.5.0. The public protocol and private application/backoffice remain separate. Mainnet signing is disabled.
 
 ## Implemented and tested
 
@@ -30,6 +30,13 @@ The [inspected current Zenex market](evidence/zenex-interface-inspection-2026-10
 
 ## Verification and remaining work
 
-66 Rust tests and 61 TypeScript tests passed locally. Generated schemas were checked against actual compiled WASM; immutable historical tournament ABIs remain intact. No third-party implementation binaries are redistributed. Tests/evidence verify the stated scopes and do not replace independent review.
+66 Rust tests and 65 TypeScript tests passed locally. Generated schemas were checked against actual compiled WASM; immutable historical tournament ABIs remain intact. No third-party implementation binaries are redistributed. Tests/evidence verify the stated scopes and do not replace independent review.
 
 Remaining work includes the real Zenex venue accounting extension and signed-report integration, independent common end valuation, Mainnet liquidity/exposure admission, long-inactive-state maintenance/restoration operation, full funding/participation access modes, installed-wallet end-to-end signatures, production operator deployment/alerts and independent security/economic review. Activity/level incentives require explicit eligibility and finite budgets. Current local services and Testnet balances are development infrastructure, not a production fleet or availability guarantee.
+
+
+## Spot trade review and Zenex handover (2026-10-30)
+
+The SDK reads the actual factory record, immutable round configuration/terms and pinned direct-pair adapter to quote Spot trades. It separates venue output, independent floor, rounded additional coverage premium and required portfolio cash. Reviews expire after thirty seconds and bind the exact round/terms/assets/amount/slippage. Limits validate their own future expiry/minimum and preserve the different new-risk and cash-return deadlines; a current market estimate is not a limit execution promise. New venue implementations require their own reviewed quote provider. Four additional tests cover policy/code/round mismatches, independent-floor failures, expiry/replay and integer premium/deadline accounting.
+
+The actual Zenex market code and public configuration were rechecked without signing. The actionable [integration request](zenex-integration-request.md) specifies the mandatory cumulative successful-payment semantics, negotiable API shape, complete signed reports, reproducible official deployment and seven joint acceptance cases. No venue upgrade, credentials or live Zenex admission is claimed.

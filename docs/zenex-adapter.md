@@ -40,3 +40,6 @@ After the round's purchase deadline the executor immediately selects the cash pu
 Build the own WASMs before Rust tests; seven strict-authorization tests cover normal long/short exits, gain/donation accounting, forced payments and credits, incomplete claims plus frozen ownership handover, unfilled entry rollback/retry, unsupported/reset accounting and unauthorized calls. SDK tests cover request encoding and rejection of the missing actual getter. `node scripts/inspect-zenex.mjs <fetched-market.wasm> <new-evidence-path>` inspects the already fetched real WASM without signing or changing registry admission. Report configuration is described in the [executor runbook](executor-operations.md).
 
 Live enablement requires the actual venue extension, real oracle access and a separately reviewed admission. No threshold of ranking certifiers was introduced.
+
+
+The actionable [venue integration request](zenex-integration-request.md) distinguishes the mandatory payment semantics from the negotiable API shape and defines joint acceptance tests. The exact combined getter is used by the current prototype; an equivalent authenticated cumulative paid view can be composed with existing venue views after a reviewed adapter change.
